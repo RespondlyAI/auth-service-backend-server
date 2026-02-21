@@ -2,6 +2,7 @@ package in.respondlyai.auth.exception
 
 import com.fasterxml.jackson.annotation.JsonInclude
 import io.swagger.v3.oas.annotations.media.Schema
+import java.time.Instant
 
 /**
  * Structured error response DTO.

@@ -54,6 +54,7 @@ class AuthService {
                     savedUser.getRole()
             )
         } catch (Exception ex) {
+            if (ex instanceof ApiException) throw ex
             log.error("Signup error: {}", ex.message)
             throw ApiException.internalError("Failed to create user account")
         }
