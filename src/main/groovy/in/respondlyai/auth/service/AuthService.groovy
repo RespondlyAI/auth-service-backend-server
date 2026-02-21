@@ -45,7 +45,7 @@ class AuthService {
 
             User savedUser = userRepository.save(user)
 
-            log.info("User created successfully: userId={}, email={}", savedUser.userId, savedUser.email)
+            log.info("User created successfully: userId={}", savedUser.userId)
 
             return new AuthResponse(
                     null,
@@ -53,13 +53,9 @@ class AuthService {
                     savedUser.getEmail(),
                     savedUser.getRole()
             )
-        } catch (ApiException ex) {
-            throw ex
         } catch (Exception ex) {
-            log.error("Signup error for email={}: {}", request.email, ex.message)
-            throw ApiException.internalError("Failed to create user account", [
-                    email: request.email
-            ])
+            log.error("Signup error: {}", ex.message)
+            throw ApiException.internalError("Failed to create user account")
         }
     }
 }

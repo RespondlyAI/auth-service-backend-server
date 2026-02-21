@@ -49,7 +49,7 @@ class AuthController {
                             schema = @Schema(implementation = ApiErrorResponse),
                             examples = @ExampleObject(
                                     name = "Validation Error",
-                                    value = '{"success":false,"message":"Name is required, Password must be between 6 and 40 characters","type":"VALIDATION_ERROR","timestamp":"2026-02-21T14:30:00.000Z","metadata":{"fields":{"name":"Name is required","password":"Password must be between 6 and 40 characters"}},"path":"/api/auth/signup","method":"POST"}'
+                                    value = '{"success":false,"message":"Name is required, Password must be between 6 and 40 characters","type":"VALIDATION_ERROR","timestamp":"2026-02-21T14:30:00.000Z"}'
                             )
                     )
             ),
@@ -60,7 +60,7 @@ class AuthController {
                             schema = @Schema(implementation = ApiErrorResponse),
                             examples = @ExampleObject(
                                     name = "Forbidden",
-                                    value = '{"success":false,"message":"Only users with role OWNER can signup","type":"FORBIDDEN","timestamp":"2026-02-21T14:30:00.000Z","path":"/api/auth/signup","method":"POST"}'
+                                    value = '{"success":false,"message":"Only users with role OWNER can signup","type":"FORBIDDEN","timestamp":"2026-02-21T14:30:00.000Z"}'
                             )
                     )
             ),
@@ -71,7 +71,7 @@ class AuthController {
                             schema = @Schema(implementation = ApiErrorResponse),
                             examples = @ExampleObject(
                                     name = "Conflict",
-                                    value = '{"success":false,"message":"Email already in use","type":"CONFLICT","timestamp":"2026-02-21T14:30:00.000Z","path":"/api/auth/signup","method":"POST"}'
+                                    value = '{"success":false,"message":"Email already in use","type":"CONFLICT","timestamp":"2026-02-21T14:30:00.000Z"}'
                             )
                     )
             ),
@@ -82,11 +82,12 @@ class AuthController {
                             schema = @Schema(implementation = ApiErrorResponse),
                             examples = @ExampleObject(
                                     name = "Internal Error",
-                                    value = '{"success":false,"message":"Failed to create user account","type":"INTERNAL_SERVER_ERROR","timestamp":"2026-02-21T14:30:00.000Z","path":"/api/auth/signup","method":"POST"}'
+                                    value = '{"success":false,"message":"Failed to create user account","type":"INTERNAL_SERVER_ERROR","timestamp":"2026-02-21T14:30:00.000Z"}'
                             )
                     )
             )
     ])
+
 
 
     ResponseEntity<AuthResponse> signup(@Valid @RequestBody SignupRequest request) {

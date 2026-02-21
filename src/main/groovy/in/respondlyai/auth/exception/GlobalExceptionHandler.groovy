@@ -20,14 +20,19 @@ class GlobalExceptionHandler {
     private String activeProfile
 
     private boolean isDev() {
-        return activeProfile == 'local' || activeProfile == 'dev' || activeProfile == 'development'
+        if (!activeProfile) return false
+        return activeProfile.split('\\s*,\\s*').any { it == 'local' || it == 'dev' || it == 'development' }
     }
 
     // Handle custom ApiException 
 
     @ExceptionHandler(ApiException)
     ResponseEntity<ApiErrorResponse> handleApiException(ApiException ex, HttpServletRequest request) {
-        log.error("API Error: {} [{}] {} - {}", ex.errorType, ex.status.value(), request.requestURI, ex.message)
+        if (ex.status.is5xxServerError()) {
+            log.error("API Error: {} [{}] {} - {}", ex.errorType, ex.status.value(), request.requestURI, ex.message)
+        } else {
+            log.warn("API Error: {} [{}] {} - {}", ex.errorType, ex.status.value(), request.requestURI, ex.message)
+        }
 
         ApiErrorResponse response = new ApiErrorResponse(ex.message, ex.errorType)
 
