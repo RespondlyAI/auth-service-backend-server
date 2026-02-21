@@ -29,8 +29,11 @@ class User {
     Boolean isVerified = false
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "role", nullable = false)
+    @Column(name = "role")
     Role role = Role.OWNER
+
+    @Column(name = "organization")
+    String organization
 
     @Column(name = "created_at", nullable = false, updatable = false)
     LocalDateTime createdAt
