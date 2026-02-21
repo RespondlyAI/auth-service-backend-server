@@ -1,6 +1,6 @@
 package in.respondlyai.auth.dto
 
-import in.respondlyai.auth.model.Role
+import in.respondlyai.auth.entity.Role
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
