@@ -5,6 +5,7 @@ import in.respondlyai.auth.dto.SignupRequest
 import in.respondlyai.auth.dto.AuthResponse
 import in.respondlyai.auth.service.AuthService
 
+import jakarta.validation.Valid
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
@@ -19,7 +20,7 @@ class AuthController {
     }
 
     @PostMapping("/signup")
-    ResponseEntity<AuthResponse> signup(@RequestBody SignupRequest request){
+    ResponseEntity<AuthResponse> signup(@Valid @RequestBody SignupRequest request){
 
         AuthResponse response = authService.signup(request)
         return ResponseEntity.ok(response)

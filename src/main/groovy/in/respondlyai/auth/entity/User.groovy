@@ -9,7 +9,7 @@ import java.time.LocalDateTime
 class User {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "uuid", updatable = false, nullable = false)
     UUID uuid
 
@@ -30,7 +30,7 @@ class User {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "role", nullable = false)
-    Role role
+    Role role = Role.OWNER
 
     @Column(name = "created_at", nullable = false, updatable = false)
     LocalDateTime createdAt
