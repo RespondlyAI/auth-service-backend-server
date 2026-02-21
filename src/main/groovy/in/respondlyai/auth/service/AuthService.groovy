@@ -28,7 +28,7 @@ class AuthService {
         }
 
         User user = new User()
-        user.setId(UUID.randomUUID().toString())
+        user.setUserId(UUID.randomUUID().toString())
         user.setName(request.name)
         user.setEmail(request.email)
         user.setPassword(request.password)
@@ -37,7 +37,8 @@ class AuthService {
         User savedUser = userRepository.save(user)
 
         return new AuthResponse(
-                savedUser.getId(),
+                null,
+                savedUser.getUserId(),
                 savedUser.getEmail(),
                 savedUser.getRole()
         )

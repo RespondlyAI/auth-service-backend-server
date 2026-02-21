@@ -9,12 +9,12 @@ import java.time.LocalDateTime
 class User {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
+    @org.hibernate.annotations.UuidGenerator
     @Column(name = "uuid", updatable = false, nullable = false)
     UUID uuid
 
-    @Column(name = "id", nullable = false, unique = true)
-    String id
+    @Column(name = "user_id", nullable = false, unique = true)
+    String userId
 
     @Column(name = "name", nullable = false)
     String name
