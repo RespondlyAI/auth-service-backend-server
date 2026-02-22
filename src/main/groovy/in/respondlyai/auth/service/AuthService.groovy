@@ -8,6 +8,7 @@ import in.respondlyai.auth.exception.ApiException
 import in.respondlyai.auth.repository.UserRepository
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -17,9 +18,11 @@ class AuthService {
     private static final Logger log = LoggerFactory.getLogger(AuthService)
 
     private final UserRepository userRepository
+    private final PasswordEncoder passwordEncoder
 
-    AuthService(UserRepository userRepository) {
+    AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository
+        this.passwordEncoder = passwordEncoder
     }
 
     @Transactional
@@ -40,7 +43,7 @@ class AuthService {
             user.setUserId(UUID.randomUUID().toString())
             user.setName(request.name)
             user.setEmail(request.email)
-            user.setPassword(request.password)
+            user.setPassword(passwordEncoder.encode(request.password))
             user.setRole(Role.OWNER)
 
             User savedUser = userRepository.save(user)
