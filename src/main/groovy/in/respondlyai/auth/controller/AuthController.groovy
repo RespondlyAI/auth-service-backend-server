@@ -1,6 +1,7 @@
 package in.respondlyai.auth.controller
 
 import in.respondlyai.auth.dto.SignupRequest
+import in.respondlyai.auth.dto.LoginRequest
 import in.respondlyai.auth.dto.AuthResponse
 import in.respondlyai.auth.exception.ApiErrorResponse
 import in.respondlyai.auth.service.AuthService
@@ -93,5 +94,44 @@ class AuthController {
     ResponseEntity<AuthResponse> signup(@Valid @RequestBody SignupRequest request) {
         AuthResponse response = authService.signup(request)
         return ResponseEntity.status(HttpStatus.CREATED).body(response)
+    }
+
+    @PostMapping("/login")
+    @Operation(
+            summary = "Login existing user",
+            description = "Authenticates a user with email and password and returns access token."
+    )
+    @ApiResponses([
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Login successful",
+                    content = @Content(schema = @Schema(implementation = AuthResponse))
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Bad request — missing or invalid credentials",
+                    content = @Content(
+                            schema = @Schema(implementation = ApiErrorResponse),
+                            examples = @ExampleObject(
+                                    name = "Bad Request",
+                                    value = '{"success":false,"message":"Email and password are required","type":"BAD_REQUEST","timestamp":"2026-02-21T14:30:00.000Z"}'
+                            )
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized — invalid credentials",
+                    content = @Content(
+                            schema = @Schema(implementation = ApiErrorResponse),
+                            examples = @ExampleObject(
+                                    name = "Unauthorized",
+                                    value = '{"success":false,"message":"Invalid email or password","type":"UNAUTHORIZED","timestamp":"2026-02-21T14:30:00.000Z"}'
+                            )
+                    )
+            )
+    ])
+    ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
+        AuthResponse response = authService.login(request)
+        return ResponseEntity.ok(response)
     }
 }

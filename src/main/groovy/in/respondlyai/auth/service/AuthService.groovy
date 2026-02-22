@@ -1,6 +1,7 @@
 package in.respondlyai.auth.service
 
 import in.respondlyai.auth.dto.AuthResponse
+import in.respondlyai.auth.dto.LoginRequest
 import in.respondlyai.auth.dto.SignupRequest
 import in.respondlyai.auth.entity.Role
 import in.respondlyai.auth.entity.User
@@ -23,6 +24,36 @@ class AuthService {
     AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository
         this.passwordEncoder = passwordEncoder
+    }
+
+    @Transactional(readOnly = true)
+    AuthResponse login(LoginRequest request) {
+        // Manual simplified validation
+        if (!request.email || !request.password) {
+            throw ApiException.badRequest("Email and password are required")
+        }
+
+        if (request.password.length() < 6) {
+            throw ApiException.badRequest("Password must be between 6 and 40 characters")
+        }
+
+        // Find user by email
+        User user = userRepository.findByEmail(request.email)
+                .orElseThrow({ ApiException.authError("Invalid email..") })
+
+        // Verify password
+        if (!passwordEncoder.matches(request.password, user.password)) {
+            throw ApiException.authError("Invalid password")
+        }
+
+        log.info("User logged in successfully: userId={}, email={}", user.userId, user.email)
+
+        return new AuthResponse(
+                null, // token will be generated later
+                user.getUserId(),
+                user.getEmail(),
+                user.getRole()
+        )
     }
 
     @Transactional
