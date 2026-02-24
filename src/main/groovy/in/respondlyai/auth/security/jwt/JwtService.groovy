@@ -3,6 +3,7 @@ package in.respondlyai.auth.security.jwt
 import io.jsonwebtoken.Claims
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.security.Keys
+import jakarta.annotation.PostConstruct
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.stereotype.Service
@@ -22,6 +23,19 @@ class JwtService {
 
     @Value('${application.security.jwt.expiration}')
     private long jwtExpiration
+
+    private SecretKey signingKey
+
+    @PostConstruct
+    void init() {
+        byte[] keyBytes = secretKey.getBytes(StandardCharsets.UTF_8)
+        if (keyBytes.length < 32) {
+            throw new IllegalArgumentException(
+                "JWT secret key is too weak: must be at least 32 bytes (256 bits), " +
+                "but got ${keyBytes.length} bytes. Update 'application.security.jwt.secret-key'.")
+        }
+        signingKey = Keys.hmacShaKeyFor(keyBytes)
+    }
 
     /**
      * Extracts email
@@ -86,10 +100,9 @@ class JwtService {
     }
 
     /**
-     * Converts secretKey string into a secure cryptic key.
+     * Returns the cached signing key, pre-validated at startup.
      */
     private SecretKey getSignInKey() {
-        byte[] keyBytes = secretKey.getBytes(StandardCharsets.UTF_8)
-        return Keys.hmacShaKeyFor(keyBytes)
+        return signingKey
     }
 }
