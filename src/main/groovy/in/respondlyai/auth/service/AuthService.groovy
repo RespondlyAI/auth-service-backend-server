@@ -7,8 +7,10 @@ import in.respondlyai.auth.entity.Role
 import in.respondlyai.auth.entity.User
 import in.respondlyai.auth.exception.ApiException
 import in.respondlyai.auth.repository.UserRepository
+import in.respondlyai.auth.security.jwt.JwtService
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
+import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -20,11 +22,15 @@ class AuthService {
 
     private final UserRepository userRepository
     private final PasswordEncoder passwordEncoder
+    private final JwtService jwtService
 
-    AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+    AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
+                JwtService jwtService) {
         this.userRepository = userRepository
         this.passwordEncoder = passwordEncoder
+        this.jwtService = jwtService
     }
+
 
     @Transactional(readOnly = true)
     AuthResponse login(LoginRequest request) {
@@ -46,10 +52,14 @@ class AuthService {
             throw ApiException.authError("Invalid password")
         }
 
+        // Generate JWT token
+        UserDetails userDetails = AppUserDetailsService.toUserDetails(user)
+        String token = jwtService.generateToken(userDetails, user.userId, user.role.name())
+
         log.info("User logged in successfully: userId={}, email={}", user.userId, user.email)
 
         return new AuthResponse(
-                null, // token will be generated later
+                token,
                 user.getUserId(),
                 user.getEmail(),
                 user.getRole()
@@ -79,10 +89,14 @@ class AuthService {
 
             User savedUser = userRepository.save(user)
 
+            // Generate JWT token for the new user
+            UserDetails userDetails = AppUserDetailsService.toUserDetails(savedUser)
+            String token = jwtService.generateToken(userDetails, savedUser.userId, savedUser.role.name())
+
             log.info("User created successfully: userId={}", savedUser.userId)
 
             return new AuthResponse(
-                    null,
+                    token,
                     savedUser.getUserId(),
                     savedUser.getEmail(),
                     savedUser.getRole()
