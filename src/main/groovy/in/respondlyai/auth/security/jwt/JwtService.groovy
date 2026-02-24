@@ -13,7 +13,7 @@ import java.nio.charset.StandardCharsets
 import java.util.function.Function
 
 /**
- jwt service 
+ * Service for JWT token generation, validation, and claim extraction.
  */
 @Service
 class JwtService {
@@ -38,7 +38,7 @@ class JwtService {
     }
 
     /**
-     * Extracts email
+     * Extracts the email address from the JWT token's subject claim.
      */
     String extractEmail(String token) {
         return extractClaim(token, Claims::getSubject)
@@ -77,7 +77,14 @@ class JwtService {
      */
     boolean isTokenValid(String token, UserDetails userDetails) {
         final String email = extractEmail(token)
-        return (email == userDetails.getUsername()) && !isTokenExpired(token)
+        return email?.equals(userDetails.getUsername()) && !isTokenExpired(token)
+    }
+
+    /**
+     * Extracts the role name from the JWT token's custom claims.
+     */
+    String extractRole(String token) {
+        return (String) extractClaim(token, { Claims claims -> claims.get("role") })
     }
 
     private boolean isTokenExpired(String token) {

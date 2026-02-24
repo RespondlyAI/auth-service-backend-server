@@ -9,10 +9,10 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import org.springframework.lang.NonNull
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
+import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.security.core.userdetails.User
 import org.springframework.security.core.userdetails.UserDetails
-import org.springframework.security.core.userdetails.UserDetailsService
-import org.springframework.security.core.userdetails.UsernameNotFoundException
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource
 import org.springframework.stereotype.Component
 import org.springframework.web.filter.OncePerRequestFilter
@@ -26,11 +26,9 @@ class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter)
 
     private final JwtService jwtService
-    private final UserDetailsService userDetailsService
 
-    JwtAuthenticationFilter(JwtService jwtService, UserDetailsService userDetailsService) {
+    JwtAuthenticationFilter(JwtService jwtService) {
         this.jwtService = jwtService
-        this.userDetailsService = userDetailsService
     }
 
     @Override
@@ -50,13 +48,19 @@ class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             final String jwt = authHeader.substring(7)
 
-            // Throws JwtException for malformed / expired / unsupported tokens
+            // Throws JwtException for malformed / expired / unsupported tokens.
+            // Signature verification also happens here, so the claims are trustworthy.
             final String userEmail = jwtService.extractEmail(jwt)
+            final String role = jwtService.extractRole(jwt)
 
             if (userEmail != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
-                // Throws UsernameNotFoundException if user was deleted after token was issued
-                UserDetails userDetails = this.userDetailsService.loadUserByUsername(userEmail)
+                // Build UserDetails from JWT claims — no DB call needed for stateless auth.
+                // Token integrity is already guaranteed by the signature check above.
+                UserDetails userDetails = new User(
+                        userEmail, "",
+                        Collections.singletonList(new SimpleGrantedAuthority("ROLE_${role}"))
+                )
 
                 if (jwtService.isTokenValid(jwt, userDetails)) {
                     UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
@@ -70,8 +74,8 @@ class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
         } catch (JwtException ex) {
             log.warn("Invalid JWT token [{}]: {}", request.getRequestURI(), ex.getMessage())
-        } catch (UsernameNotFoundException ex) {
-            log.warn("JWT references a user that no longer exists [{}]: {}", request.getRequestURI(), ex.getMessage())
+        } catch (Exception ex) {
+            log.error("Unexpected error during JWT authentication [{}]", request.getRequestURI(), ex)
         }
 
         filterChain.doFilter(request, response)

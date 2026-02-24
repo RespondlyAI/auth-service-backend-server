@@ -10,7 +10,6 @@ import in.respondlyai.auth.repository.UserRepository
 import in.respondlyai.auth.security.jwt.JwtService
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
@@ -32,17 +31,6 @@ class AuthService {
         this.jwtService = jwtService
     }
 
-    /**
-     * Builds a Spring Security UserDetails from a User entity.
-     * Avoids a redundant database round-trip compared to calling loadUserByUsername.
-     */
-    private static UserDetails toUserDetails(User user) {
-        return new org.springframework.security.core.userdetails.User(
-                user.email,
-                user.password,
-                Collections.singletonList(new SimpleGrantedAuthority("ROLE_${user.role.name()}"))
-        )
-    }
 
     @Transactional(readOnly = true)
     AuthResponse login(LoginRequest request) {
@@ -65,7 +53,7 @@ class AuthService {
         }
 
         // Generate JWT token
-        UserDetails userDetails = toUserDetails(user)
+        UserDetails userDetails = AppUserDetailsService.toUserDetails(user)
         String token = jwtService.generateToken(userDetails, user.userId, user.role.name())
 
         log.info("User logged in successfully: userId={}, email={}", user.userId, user.email)
@@ -102,7 +90,7 @@ class AuthService {
             User savedUser = userRepository.save(user)
 
             // Generate JWT token for the new user
-            UserDetails userDetails = toUserDetails(savedUser)
+            UserDetails userDetails = AppUserDetailsService.toUserDetails(savedUser)
             String token = jwtService.generateToken(userDetails, savedUser.userId, savedUser.role.name())
 
             log.info("User created successfully: userId={}", savedUser.userId)

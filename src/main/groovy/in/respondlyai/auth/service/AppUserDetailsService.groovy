@@ -27,7 +27,14 @@ class AppUserDetailsService implements UserDetailsService {
     UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         User user = userRepository.findByEmail(email)
                 .orElseThrow({ new UsernameNotFoundException("User not found with email: ${email}") })
+        return toUserDetails(user)
+    }
 
+    /**
+     * Converts a User entity to a Spring Security UserDetails object.
+     * Shared by both this service and AuthService to avoid duplicating the mapping logic.
+     */
+    static UserDetails toUserDetails(User user) {
         return new org.springframework.security.core.userdetails.User(
                 user.email,
                 user.password,
