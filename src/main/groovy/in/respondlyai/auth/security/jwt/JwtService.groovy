@@ -55,10 +55,13 @@ class JwtService {
     /**
      * Generates a new JWT token for a specific user.
      */
-    String generateToken(UserDetails userDetails, String userId, String role) {
+    String generateToken(UserDetails userDetails, String userId, String role, String organizationId) {
         Map<String, Object> claims = new HashMap<>()
         claims.put("role", role)
         claims.put("userId", userId)
+        if (organizationId) {
+            claims.put("organizationId", organizationId)
+        }
         return generateToken(claims, userDetails)
     }
 
