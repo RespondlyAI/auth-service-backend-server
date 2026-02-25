@@ -32,8 +32,8 @@ class User {
     @Column(name = "role")
     Role role = Role.OWNER
 
-    @Column(name = "organization")
-    String organization
+    @Column(name = "organization_id")
+    String organizationId
 
     @Column(name = "created_at", nullable = false, updatable = false)
     LocalDateTime createdAt
