@@ -54,7 +54,7 @@ class AuthService {
 
         // Generate JWT token
         UserDetails userDetails = AppUserDetailsService.toUserDetails(user)
-        String token = jwtService.generateToken(userDetails, user.userId, user.role.name())
+        String token = jwtService.generateToken(userDetails, user.userId, user.role.name(), user.organizationId)
 
         log.info("User logged in successfully: userId={}, email={}", user.userId, user.email)
 
@@ -91,7 +91,7 @@ class AuthService {
 
             // Generate JWT token for the new user
             UserDetails userDetails = AppUserDetailsService.toUserDetails(savedUser)
-            String token = jwtService.generateToken(userDetails, savedUser.userId, savedUser.role.name())
+            String token = jwtService.generateToken(userDetails, savedUser.userId, savedUser.role.name(), savedUser.organizationId)
 
             log.info("User created successfully: userId={}", savedUser.userId)
 
