@@ -1,0 +1,69 @@
+title Auth Service - RespondlyAI
+
+Auth Service [color: blue] {
+
+  REST API Layer {
+    Auth Controller [icon: server]
+    Swagger UI [icon: browser]
+  }
+
+  Security Layer {
+    JWT Auth Filter [icon: shield]
+    Security Config [icon: lock]
+  }
+
+  Business Layer {
+    Auth Service Logic [icon: settings]
+    AppUser Details Service [icon: user]
+    JWT Service [icon: key]
+  }
+
+  Data Layer {
+    User Repository [icon: database]
+  }
+
+  Domain {
+    User Entity [icon: table]
+    Role Enum [icon: list]
+  }
+
+}
+
+Database Layer [color: green] {
+  PostgreSQL [icon: postgresql]
+  Flyway Migrations [icon: migration]
+}
+
+Client [icon: web]
+OpenAPI Docs [icon: book]
+
+// Client interactions
+Client > Auth Controller: POST /api/auth/signup
+Client > Auth Controller: POST /api/auth/login
+Client > Swagger UI: browse docs
+Swagger UI > OpenAPI Docs
+
+// Security filter chain (every request passes through)
+Auth Controller > JWT Auth Filter: intercept request
+JWT Auth Filter > JWT Service: validate Bearer token
+JWT Auth Filter > Security Config: set SecurityContext
+
+// Signup flow
+Auth Controller > Auth Service Logic: signup(SignupRequest)
+Auth Service Logic > User Repository: existsByEmail
+Auth Service Logic > User Repository: save(User Entity)
+Auth Service Logic > JWT Service: generateToken
+JWT Service > Auth Controller: JWT token
+Auth Controller > Client: AuthResponse (token, role, userId)
+
+// Login flow
+Auth Controller > Auth Service Logic: login(LoginRequest)
+Auth Service Logic > AppUser Details Service: loadUserByUsername(email)
+AppUser Details Service > User Repository: findByEmail
+Auth Service Logic > JWT Service: generateToken
+Auth Controller > Client: AuthResponse (token, role, userId)
+
+// Data access
+User Repository > PostgreSQL: JPA / CRUD queries
+User Entity > PostgreSQL: users table
+Flyway Migrations > PostgreSQL: V1 create users, V2 rename column
