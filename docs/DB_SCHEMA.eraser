@@ -1,0 +1,15 @@
+// RespondlyAI Auth Service — Database Schema
+// Managed by Flyway (V1 + V2) · Hibernate ORM · PostgreSQL 15+
+
+users [icon: table, color: blue] {
+  uuid          UUID        [pk, not null, default: "gen_random_uuid()", note: "@Id @UuidGenerator"]
+  user_id       VARCHAR(255) [not null, unique, note: "application-level user identifier"]
+  name          VARCHAR(255) [not null]
+  email         VARCHAR(255) [not null, unique]
+  password      VARCHAR(255) [not null, note: "BCrypt-encoded via PasswordEncoder"]
+  is_verified   BOOLEAN      [not null, default: false]
+  role          VARCHAR(50)  [not null, default: "OWNER", note: "@Enumerated(STRING): OWNER | ADMIN | EMPLOYEE"]
+  organization_id VARCHAR(255) [note: "nullable — renamed from 'organization' in V2 migration"]
+  created_at    TIMESTAMP    [not null, default: "NOW()", note: "@PrePersist — set by JPA lifecycle hook"]
+  updated_at    TIMESTAMP    [not null, default: "NOW()", note: "@PrePersist / @PreUpdate — set by JPA lifecycle hook"]
+}
