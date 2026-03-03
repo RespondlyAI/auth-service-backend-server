@@ -1,69 +1,358 @@
-title Auth Service - RespondlyAI
+title RespondlyAI Auth Service — Detailed Architecture
+
+// ─── EXTERNAL CLIENTS ────────────────────────────────────────────────────────
+
+Client [icon: web]
+
+Swagger UI [icon: browser] {
+  GET /swagger-ui/**
+  GET /v3/api-docs/**
+}
+
+// ─── SPRING BOOT APPLICATION  (port 8080) ───────────────────────────────────
 
 Auth Service [color: blue] {
 
-  REST API Layer {
-    Auth Controller [icon: server]
-    Swagger UI [icon: browser]
+  // ── REST API LAYER ──────────────────────────────────────────────────────
+
+  REST API Layer [color: lightBlue] {
+
+    AuthController [icon: server] {
+      @RestController
+      @RequestMapping /api/auth
+      POST /signup returns ResponseEntity<AuthResponse>
+      POST /login  returns ResponseEntity<AuthResponse>
+    }
+
   }
 
-  Security Layer {
-    JWT Auth Filter [icon: shield]
-    Security Config [icon: lock]
+  // ── REQUEST / RESPONSE DTOs ─────────────────────────────────────────────
+
+  DTO Layer [color: cyan] {
+
+    SignupRequest [icon: file-text] {
+      @NotBlank @Size(3-20) name: String
+      @NotBlank @Email @Pattern(gmail) email: String
+      @NotBlank @Size(6-40) password: String
+      @NotNull role: Role
+    }
+
+    LoginRequest [icon: file-text] {
+      @NotBlank @Email @Pattern(gmail) email: String
+      @NotBlank @Size(6-40) password: String
+    }
+
+    AuthResponse [icon: file-text] {
+      token: String
+      type: String = "Bearer"
+      id: String
+      email: String
+      role: Role
+    }
+
   }
 
-  Business Layer {
-    Auth Service Logic [icon: settings]
-    AppUser Details Service [icon: user]
-    JWT Service [icon: key]
+  // ── SECURITY LAYER ──────────────────────────────────────────────────────
+
+  Security Layer [color: orange] {
+
+    SecurityConfig [icon: lock] {
+      @Configuration @EnableWebSecurity
+      Bean: PasswordEncoder (BCryptPasswordEncoder)
+      Bean: SecurityFilterChain
+      permitAll: /api/auth/**, /swagger-ui/**, /v3/api-docs/**
+      anyRequest: authenticated
+      sessionPolicy: STATELESS
+      csrf: disabled
+      formLogin: disabled
+      httpBasic: disabled
+      addFilterBefore: JwtAuthenticationFilter
+    }
+
+    JwtAuthenticationFilter [icon: shield] {
+      @Component extends OncePerRequestFilter
+      doFilterInternal(req, res, chain): void
+      reads: Authorization Bearer token from header
+      calls: jwtService.extractEmail(jwt)
+      calls: jwtService.extractRole(jwt)
+      calls: jwtService.isTokenValid(jwt, userDetails)
+      sets: SecurityContextHolder authentication
+      stateless: no DB call (claims from verified JWT)
+    }
+
   }
 
-  Data Layer {
-    User Repository [icon: database]
+  // ── SERVICE LAYER ────────────────────────────────────────────────────────
+
+  Service Layer [color: green] {
+
+    AuthService [icon: settings] {
+      @Service
+      login(LoginRequest): AuthResponse
+        reads: @Transactional(readOnly=true)
+        calls: findByEmail > passwordEncoder.matches > generateToken
+      signup(SignupRequest): AuthResponse
+        reads: @Transactional
+        calls: existsByEmail > encode > save > generateToken
+        only OWNER role allowed to signup
+    }
+
+    AppUserDetailsService [icon: user] {
+      @Service @Primary
+      implements UserDetailsService
+      loadUserByUsername(email): UserDetails
+        calls: UserRepository.findByEmail
+        throws: UsernameNotFoundException
+      static toUserDetails(User): UserDetails
+        maps: email + bcrypt-password + ROLE_{role}
+    }
+
+    JwtService [icon: key] {
+      @Service
+      secret: @Value jwt.secret-key (min 32 bytes HMAC-SHA256)
+      expiry: @Value jwt.expiration  (ms, default 86400000)
+      @PostConstruct init(): validates key length builds SecretKey
+      generateToken(UserDetails, userId, role, orgId): String
+        JWT claims: role userId organizationId
+        JWT subject: email
+        JWT algo: HMAC-SHA256
+      extractEmail(token): String (subject claim)
+      extractRole(token): String (custom claim)
+      isTokenValid(token, UserDetails): boolean
+      extractClaim<T>(token, Function<Claims,T>): T
+      private isTokenExpired(token): boolean
+      private extractAllClaims(token): Claims
+    }
+
   }
 
-  Domain {
-    User Entity [icon: table]
-    Role Enum [icon: list]
+  // ── REPOSITORY / DATA ACCESS LAYER (Spring Data JPA) ────────────────────
+
+  Data Access Layer [color: purple] {
+
+    UserRepository [icon: database] {
+      @Repository
+      interface extends JpaRepository<User, UUID>
+      findByEmail(email: String): Optional<User>
+      existsByEmail(email: String): boolean
+      findByUserId(userId: String): Optional<User>
+      inherited: save findById findAll delete count...
+      Hibernate provider: PostgreSQLDialect
+      DDL: validate (schema managed by Flyway)
+    }
+
+  }
+
+  // ── DOMAIN / ENTITY LAYER ────────────────────────────────────────────────
+
+  Domain Layer [color: yellow] {
+
+    User [icon: table] {
+      @Entity @Table(name = "users")
+      @Id @UuidGenerator uuid: UUID
+      @Column(unique) userId: String
+      @Column name: String
+      @Column(unique) email: String
+      @Column password: String (BCrypt encoded)
+      @Column isVerified: Boolean = false
+      @Enumerated(STRING) role: Role = OWNER
+      @Column organizationId: String (nullable)
+      @Column(updatable=false) createdAt: LocalDateTime
+      @Column updatedAt: LocalDateTime
+      @PrePersist  onCreate(): sets createdAt updatedAt
+      @PreUpdate   onUpdate(): sets updatedAt
+    }
+
+    Role [icon: list] {
+      enum
+      OWNER
+      ADMIN
+      EMPLOYEE
+    }
+
+  }
+
+  // ── EXCEPTION LAYER ──────────────────────────────────────────────────────
+
+  Exception Layer [color: red] {
+
+    GlobalExceptionHandler [icon: alert-triangle] {
+      @ControllerAdvice
+      @Value spring.profiles.active
+      handleApiException(ApiException): ResponseEntity
+      handleValidationException(MethodArgumentNotValidException): ResponseEntity
+      handleDataIntegrityViolation(DataIntegrityViolationException): ResponseEntity
+      handleGenericException(Exception): ResponseEntity
+      dev-only fields appended when profile = local or dev
+    }
+
+    ApiException [icon: alert-circle] {
+      extends RuntimeException
+      status: HttpStatus
+      errorType: ErrorType
+      metadata: Map<String,Object>
+      static validationError(msg)     -> 400 VALIDATION_ERROR
+      static authError(msg)           -> 401 AUTH_ERROR
+      static forbidden(msg)           -> 403 FORBIDDEN
+      static notFound(msg)            -> 404 NOT_FOUND
+      static conflict(msg)            -> 409 CONFLICT
+      static badRequest(msg)          -> 400 BAD_REQUEST
+      static internalError(msg)       -> 500 INTERNAL_SERVER_ERROR
+      static databaseError(msg)       -> 500 DATABASE_ERROR
+      static serviceUnavailable(msg)  -> 503 SERVICE_UNAVAILABLE
+    }
+
+    ApiErrorResponse [icon: file-minus] {
+      @JsonInclude(NON_NULL)
+      success: boolean = false
+      message: String
+      type: ErrorType
+      timestamp: String ISO-8601
+      stack: String (dev only)
+      metadata: Map<String,Object> (dev only)
+      path: String (dev only)
+      method: String (dev only)
+    }
+
+    ErrorType [icon: list] {
+      enum
+      VALIDATION_ERROR
+      AUTH_ERROR
+      FORBIDDEN
+      NOT_FOUND
+      CONFLICT
+      DATABASE_ERROR
+      BAD_REQUEST
+      INTERNAL_SERVER_ERROR
+      SERVICE_UNAVAILABLE
+    }
+
+  }
+
+  // ── CONFIGURATION ────────────────────────────────────────────────────────
+
+  Configuration Layer [color: gray] {
+
+    SwaggerConfig [icon: book] {
+      @Configuration
+      Bean: OpenAPI
+      title: RespondlyAI Auth Service API
+      version: 1.0.0
+      contact: support@respondly.ai
+      server: http://localhost:8080
+    }
+
   }
 
 }
 
-Database Layer [color: green] {
-  PostgreSQL [icon: postgresql]
-  Flyway Migrations [icon: migration]
+// ─── PERSISTENCE LAYER ──────────────────────────────────────────────────────
+
+Persistence Layer [color: green] {
+
+  PostgreSQL DB [icon: database] {
+    port: 5432
+    database: auth_db
+    users table {
+      uuid UUID PK DEFAULT gen_random_uuid()
+      user_id VARCHAR(255) NOT NULL UNIQUE
+      name VARCHAR(255) NOT NULL
+      email VARCHAR(255) NOT NULL UNIQUE
+      password VARCHAR(255) NOT NULL (BCrypt)
+      is_verified BOOLEAN NOT NULL DEFAULT FALSE
+      role VARCHAR(50) NOT NULL DEFAULT OWNER
+      organization_id VARCHAR(255) nullable
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      CONSTRAINT chk_role IN (OWNER ADMIN EMPLOYEE)
+    }
+  }
+
+  Flyway Migrations [icon: layers] {
+    V1__create_users_table.sql
+      CREATE TABLE users
+      ADD CONSTRAINT chk_role
+    V2__rename_organization_column.sql
+      RENAME COLUMN organization TO organization_id
+  }
+
 }
 
-Client [icon: web]
-OpenAPI Docs [icon: book]
+// ─── SPRING FRAMEWORK INTERFACES (external dependencies) ────────────────────
 
-// Client interactions
-Client > Auth Controller: POST /api/auth/signup
-Client > Auth Controller: POST /api/auth/login
-Client > Swagger UI: browse docs
-Swagger UI > OpenAPI Docs
+Spring Framework [color: lightGray] {
+  JpaRepository<User, UUID> [icon: layers]
+  UserDetailsService [icon: layers]
+  OncePerRequestFilter [icon: layers]
+  PasswordEncoder [icon: layers]
+  UsernamePasswordAuthenticationToken [icon: layers]
+}
 
-// Security filter chain (every request passes through)
-Auth Controller > JWT Auth Filter: intercept request
-JWT Auth Filter > JWT Service: validate Bearer token
-JWT Auth Filter > Security Config: set SecurityContext
 
-// Signup flow
-Auth Controller > Auth Service Logic: signup(SignupRequest)
-Auth Service Logic > User Repository: existsByEmail
-Auth Service Logic > User Repository: save(User Entity)
-Auth Service Logic > JWT Service: generateToken
-JWT Service > Auth Controller: JWT token
-Auth Controller > Client: AuthResponse (token, role, userId)
+// ════════════════════════════════════════════════════════════════════════════
+// CONNECTIONS
+// ════════════════════════════════════════════════════════════════════════════
 
-// Login flow
-Auth Controller > Auth Service Logic: login(LoginRequest)
-Auth Service Logic > AppUser Details Service: loadUserByUsername(email)
-AppUser Details Service > User Repository: findByEmail
-Auth Service Logic > JWT Service: generateToken
-Auth Controller > Client: AuthResponse (token, role, userId)
+// ── External clients ──────────────────────────────────────────────────────
+Client > AuthController: POST /api/auth/signup (JSON: SignupRequest)
+Client > AuthController: POST /api/auth/login  (JSON: LoginRequest)
+Client > Swagger UI: browse API docs
 
-// Data access
-User Repository > PostgreSQL: JPA / CRUD queries
-User Entity > PostgreSQL: users table
-Flyway Migrations > PostgreSQL: V1 create users, V2 rename column
+// ── Swagger → config ──────────────────────────────────────────────────────
+Swagger UI > SwaggerConfig: reads OpenAPI bean
+
+// ── Security filter chain ─────────────────────────────────────────────────
+SecurityConfig > JwtAuthenticationFilter: addFilterBefore UsernamePasswordAuthenticationFilter
+JwtAuthenticationFilter > JwtService: extractEmail(jwt)
+JwtAuthenticationFilter > JwtService: extractRole(jwt)
+JwtAuthenticationFilter > JwtService: isTokenValid(jwt, userDetails)
+
+// ── Controller → DTOs ─────────────────────────────────────────────────────
+AuthController > SignupRequest: @Valid @RequestBody deserialise
+AuthController > LoginRequest: @RequestBody deserialise
+AuthController > AuthResponse: build ResponseEntity<AuthResponse>
+
+// ── Controller → Services ─────────────────────────────────────────────────
+AuthController > AuthService: signup(SignupRequest): AuthResponse
+AuthController > AuthService: login(LoginRequest): AuthResponse
+
+// ── Controller → Exception handler ────────────────────────────────────────
+AuthController > GlobalExceptionHandler: ApiException propagates via @ControllerAdvice
+
+// ── AuthService dependencies ──────────────────────────────────────────────
+AuthService > SecurityConfig: injects PasswordEncoder (BCryptPasswordEncoder)
+AuthService > JwtService: generateToken(userDetails, userId, role, orgId): String
+AuthService > AppUserDetailsService: toUserDetails(User) static call
+AuthService > UserRepository: existsByEmail(email): boolean
+AuthService > UserRepository: save(user): User
+AuthService > UserRepository: findByEmail(email): Optional<User>
+AuthService > ApiException: throws forbidden / conflict / authError / badRequest / internalError
+
+// ── AppUserDetailsService dependencies ───────────────────────────────────
+AppUserDetailsService > UserRepository: findByEmail(email): Optional<User>
+AppUserDetailsService > Spring Framework: implements UserDetailsService
+
+// ── JwtAuthenticationFilter extends Spring ─────────────────────────────
+JwtAuthenticationFilter > Spring Framework: extends OncePerRequestFilter
+
+// ── UserRepository → Spring JPA ───────────────────────────────────────────
+UserRepository > Spring Framework: extends JpaRepository<User, UUID>
+UserRepository > User: JPA entity operations (select insert update delete)
+
+// ── Entity → DB ───────────────────────────────────────────────────────────
+User > PostgreSQL DB: @Entity mapped to users table via Hibernate
+Role > PostgreSQL DB: stored as VARCHAR with chk_role constraint
+
+// ── Flyway → DB ───────────────────────────────────────────────────────────
+Flyway Migrations > PostgreSQL DB: V1 create users table on startup
+Flyway Migrations > PostgreSQL DB: V2 rename column on startup
+
+// ── Exception layer wiring ────────────────────────────────────────────────
+GlobalExceptionHandler > ApiErrorResponse: constructs structured error body
+GlobalExceptionHandler > ErrorType: categorises error
+ApiException > ErrorType: holds ErrorType enum value
+
+// ── Responses to client ───────────────────────────────────────────────────
+AuthController > Client: 201 Created  + Authorization header (Bearer token)
+AuthController > Client: 200 OK       + Authorization header (Bearer token)
+GlobalExceptionHandler > Client: 400/401/403/409/500 ApiErrorResponse JSON
