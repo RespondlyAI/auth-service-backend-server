@@ -1,358 +1,191 @@
-title RespondlyAI Auth Service — Detailed Architecture
+title RespondlyAI Auth Service — Spring Boot Architecture
 
-// ─── EXTERNAL CLIENTS ────────────────────────────────────────────────────────
+// ─── CLIENT ──────────────────────────────────────────────────────────────────
 
-Client [icon: web]
+Client [icon: monitor]
 
-Swagger UI [icon: browser] {
-  GET /swagger-ui/**
-  GET /v3/api-docs/**
-}
+// ─── SPRING BOOT APPLICATION ─────────────────────────────────────────────────
 
-// ─── SPRING BOOT APPLICATION  (port 8080) ───────────────────────────────────
+Auth Service — Spring Boot App [color: blue] {
 
-Auth Service [color: blue] {
-
-  // ── REST API LAYER ──────────────────────────────────────────────────────
-
-  REST API Layer [color: lightBlue] {
-
+  // MVC — REST API Layer
+  MVC — REST Controllers [color: sky] {
     AuthController [icon: server] {
       @RestController
       @RequestMapping /api/auth
-      POST /signup returns ResponseEntity<AuthResponse>
-      POST /login  returns ResponseEntity<AuthResponse>
+      POST /signup — 201 Created
+      POST /login  — 200 OK
     }
-
   }
 
-  // ── REQUEST / RESPONSE DTOs ─────────────────────────────────────────────
-
-  DTO Layer [color: cyan] {
-
+  // Data Transfer Objects (DTOs)
+  DTOs [color: cyan] {
     SignupRequest [icon: file-text] {
-      @NotBlank @Size(3-20) name: String
-      @NotBlank @Email @Pattern(gmail) email: String
-      @NotBlank @Size(6-40) password: String
-      @NotNull role: Role
+      Request DTO
+      Bean Validation (@Valid, @NotBlank, @Email, @Size)
+      fields: name, email, password, role
     }
-
     LoginRequest [icon: file-text] {
-      @NotBlank @Email @Pattern(gmail) email: String
-      @NotBlank @Size(6-40) password: String
+      Request DTO
+      Bean Validation (@Valid, @NotBlank, @Email)
+      fields: email, password
     }
-
     AuthResponse [icon: file-text] {
-      token: String
-      type: String = "Bearer"
-      id: String
-      email: String
-      role: Role
+      Response DTO
+      fields: token, type (Bearer), id, email, role
     }
-
+    ApiErrorResponse [icon: file-minus] {
+      Error Response DTO  @JsonInclude(NON_NULL)
+      fields: success, message, type (ErrorType), timestamp
+      dev-only: stack, path, method, metadata
+    }
   }
 
-  // ── SECURITY LAYER ──────────────────────────────────────────────────────
-
-  Security Layer [color: orange] {
-
+  // Spring Security Layer
+  Spring Security [color: orange] {
     SecurityConfig [icon: lock] {
-      @Configuration @EnableWebSecurity
+      @Configuration  @EnableWebSecurity
+      Bean: SecurityFilterChain (STATELESS, CSRF disabled)
       Bean: PasswordEncoder (BCryptPasswordEncoder)
-      Bean: SecurityFilterChain
-      permitAll: /api/auth/**, /swagger-ui/**, /v3/api-docs/**
-      anyRequest: authenticated
-      sessionPolicy: STATELESS
-      csrf: disabled
-      formLogin: disabled
-      httpBasic: disabled
-      addFilterBefore: JwtAuthenticationFilter
+      Public: /api/auth/**, /swagger-ui/**, /v3/api-docs/**
     }
-
     JwtAuthenticationFilter [icon: shield] {
-      @Component extends OncePerRequestFilter
-      doFilterInternal(req, res, chain): void
-      reads: Authorization Bearer token from header
-      calls: jwtService.extractEmail(jwt)
-      calls: jwtService.extractRole(jwt)
-      calls: jwtService.isTokenValid(jwt, userDetails)
-      sets: SecurityContextHolder authentication
-      stateless: no DB call (claims from verified JWT)
+      @Component  extends OncePerRequestFilter
+      Intercepts every request — reads Authorization header
+      Validates JWT signature, extracts email + role
+      Populates SecurityContextHolder (stateless — no DB hit)
     }
-
   }
 
-  // ── SERVICE LAYER ────────────────────────────────────────────────────────
-
-  Service Layer [color: green] {
-
+  // Business / Service Layer
+  Business — Service Layer [color: green] {
     AuthService [icon: settings] {
-      @Service
-      login(LoginRequest): AuthResponse
-        reads: @Transactional(readOnly=true)
-        calls: findByEmail > passwordEncoder.matches > generateToken
-      signup(SignupRequest): AuthResponse
-        reads: @Transactional
-        calls: existsByEmail > encode > save > generateToken
-        only OWNER role allowed to signup
+      @Service  @Transactional
+      signup() — validate role OWNER, encode password, persist, issue JWT
+      login()  — verify credentials (BCrypt), issue JWT
     }
-
-    AppUserDetailsService [icon: user] {
-      @Service @Primary
-      implements UserDetailsService
-      loadUserByUsername(email): UserDetails
-        calls: UserRepository.findByEmail
-        throws: UsernameNotFoundException
-      static toUserDetails(User): UserDetails
-        maps: email + bcrypt-password + ROLE_{role}
+    AppUserDetailsService [icon: users] {
+      @Service  @Primary
+      implements UserDetailsService (Spring Security SPI)
+      loadUserByUsername(email) — loads User, maps to UserDetails
     }
-
     JwtService [icon: key] {
       @Service
-      secret: @Value jwt.secret-key (min 32 bytes HMAC-SHA256)
-      expiry: @Value jwt.expiration  (ms, default 86400000)
-      @PostConstruct init(): validates key length builds SecretKey
-      generateToken(UserDetails, userId, role, orgId): String
-        JWT claims: role userId organizationId
-        JWT subject: email
-        JWT algo: HMAC-SHA256
-      extractEmail(token): String (subject claim)
-      extractRole(token): String (custom claim)
-      isTokenValid(token, UserDetails): boolean
-      extractClaim<T>(token, Function<Claims,T>): T
-      private isTokenExpired(token): boolean
-      private extractAllClaims(token): Claims
+      generateToken() — HMAC-SHA256, embeds userId + role + orgId
+      isTokenValid() / extractEmail() / extractRole()
+      @PostConstruct — enforces min 32-byte secret key
     }
-
   }
 
-  // ── REPOSITORY / DATA ACCESS LAYER (Spring Data JPA) ────────────────────
-
-  Data Access Layer [color: purple] {
-
+  // DAO / Repository Layer — Spring Data JPA
+  DAO — Spring Data JPA [color: purple] {
     UserRepository [icon: database] {
       @Repository
       interface extends JpaRepository<User, UUID>
-      findByEmail(email: String): Optional<User>
-      existsByEmail(email: String): boolean
-      findByUserId(userId: String): Optional<User>
-      inherited: save findById findAll delete count...
-      Hibernate provider: PostgreSQLDialect
-      DDL: validate (schema managed by Flyway)
+      Spring Data JPA — auto-generated CRUD + custom queries
+      findByEmail() / existsByEmail() / findByUserId()
     }
-
   }
 
-  // ── DOMAIN / ENTITY LAYER ────────────────────────────────────────────────
-
-  Domain Layer [color: yellow] {
-
+  // Domain / Entity Layer
+  Domain — JPA Entities [color: yellow] {
     User [icon: table] {
-      @Entity @Table(name = "users")
-      @Id @UuidGenerator uuid: UUID
-      @Column(unique) userId: String
-      @Column name: String
-      @Column(unique) email: String
-      @Column password: String (BCrypt encoded)
-      @Column isVerified: Boolean = false
-      @Enumerated(STRING) role: Role = OWNER
-      @Column organizationId: String (nullable)
-      @Column(updatable=false) createdAt: LocalDateTime
-      @Column updatedAt: LocalDateTime
-      @PrePersist  onCreate(): sets createdAt updatedAt
-      @PreUpdate   onUpdate(): sets updatedAt
+      @Entity  @Table(name = "users")
+      @Id @UuidGenerator (uuid)
+      Columns: userId, name, email, password (BCrypt),
+               isVerified, role, organizationId
+      @PrePersist / @PreUpdate — audit timestamps
     }
-
     Role [icon: list] {
-      enum
-      OWNER
-      ADMIN
-      EMPLOYEE
+      enum  (OWNER | ADMIN | EMPLOYEE)
+      @Enumerated(EnumType.STRING)
     }
-
   }
 
-  // ── EXCEPTION LAYER ──────────────────────────────────────────────────────
-
-  Exception Layer [color: red] {
-
+  // Exception Handling Layer
+  Exception Handling [color: red] {
     GlobalExceptionHandler [icon: alert-triangle] {
       @ControllerAdvice
-      @Value spring.profiles.active
-      handleApiException(ApiException): ResponseEntity
-      handleValidationException(MethodArgumentNotValidException): ResponseEntity
-      handleDataIntegrityViolation(DataIntegrityViolationException): ResponseEntity
-      handleGenericException(Exception): ResponseEntity
-      dev-only fields appended when profile = local or dev
+      Handles: ApiException, MethodArgumentNotValidException,
+               DataIntegrityViolationException, Exception
+      Returns structured ApiErrorResponse (dev-mode extras)
     }
-
     ApiException [icon: alert-circle] {
-      extends RuntimeException
-      status: HttpStatus
-      errorType: ErrorType
-      metadata: Map<String,Object>
-      static validationError(msg)     -> 400 VALIDATION_ERROR
-      static authError(msg)           -> 401 AUTH_ERROR
-      static forbidden(msg)           -> 403 FORBIDDEN
-      static notFound(msg)            -> 404 NOT_FOUND
-      static conflict(msg)            -> 409 CONFLICT
-      static badRequest(msg)          -> 400 BAD_REQUEST
-      static internalError(msg)       -> 500 INTERNAL_SERVER_ERROR
-      static databaseError(msg)       -> 500 DATABASE_ERROR
-      static serviceUnavailable(msg)  -> 503 SERVICE_UNAVAILABLE
+      Custom RuntimeException
+      Factory methods: badRequest, authError, forbidden,
+                       notFound, conflict, internalError, …
+      Carries: HttpStatus + ErrorType + metadata
     }
-
-    ApiErrorResponse [icon: file-minus] {
-      @JsonInclude(NON_NULL)
-      success: boolean = false
-      message: String
-      type: ErrorType
-      timestamp: String ISO-8601
-      stack: String (dev only)
-      metadata: Map<String,Object> (dev only)
-      path: String (dev only)
-      method: String (dev only)
-    }
-
     ErrorType [icon: list] {
       enum
-      VALIDATION_ERROR
-      AUTH_ERROR
-      FORBIDDEN
-      NOT_FOUND
-      CONFLICT
-      DATABASE_ERROR
-      BAD_REQUEST
-      INTERNAL_SERVER_ERROR
-      SERVICE_UNAVAILABLE
+      VALIDATION_ERROR, AUTH_ERROR, FORBIDDEN, NOT_FOUND,
+      CONFLICT, BAD_REQUEST, INTERNAL_SERVER_ERROR, …
     }
-
   }
 
-  // ── CONFIGURATION ────────────────────────────────────────────────────────
-
-  Configuration Layer [color: gray] {
-
+  // Configuration Layer
+  Configuration [color: gray] {
     SwaggerConfig [icon: book] {
       @Configuration
-      Bean: OpenAPI
-      title: RespondlyAI Auth Service API
-      version: 1.0.0
-      contact: support@respondly.ai
-      server: http://localhost:8080
-    }
-
-  }
-
-}
-
-// ─── PERSISTENCE LAYER ──────────────────────────────────────────────────────
-
-Persistence Layer [color: green] {
-
-  PostgreSQL DB [icon: database] {
-    port: 5432
-    database: auth_db
-    users table {
-      uuid UUID PK DEFAULT gen_random_uuid()
-      user_id VARCHAR(255) NOT NULL UNIQUE
-      name VARCHAR(255) NOT NULL
-      email VARCHAR(255) NOT NULL UNIQUE
-      password VARCHAR(255) NOT NULL (BCrypt)
-      is_verified BOOLEAN NOT NULL DEFAULT FALSE
-      role VARCHAR(50) NOT NULL DEFAULT OWNER
-      organization_id VARCHAR(255) nullable
-      created_at TIMESTAMP NOT NULL DEFAULT NOW()
-      updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-      CONSTRAINT chk_role IN (OWNER ADMIN EMPLOYEE)
+      Bean: OpenAPI (SpringDoc / Swagger UI)
+      API title, version, contact, server URL
     }
   }
 
-  Flyway Migrations [icon: layers] {
-    V1__create_users_table.sql
-      CREATE TABLE users
-      ADD CONSTRAINT chk_role
-    V2__rename_organization_column.sql
-      RENAME COLUMN organization TO organization_id
+}
+
+// ─── PERSISTENCE ─────────────────────────────────────────────────────────────
+
+Persistence [color: green] {
+  PostgreSQL [icon: database] {
+    Table: users
+    Columns: uuid, user_id, name, email, password,
+             is_verified, role, organization_id,
+             created_at, updated_at
+    Constraint: chk_role (OWNER | ADMIN | EMPLOYEE)
   }
-
+  Flyway [icon: layers] {
+    Schema Migration Tool
+    V1 — CREATE TABLE users
+    V2 — RENAME COLUMN organization -> organization_id
+  }
 }
 
-// ─── SPRING FRAMEWORK INTERFACES (external dependencies) ────────────────────
+// ─── CONNECTIONS ─────────────────────────────────────────────────────────────
 
-Spring Framework [color: lightGray] {
-  JpaRepository<User, UUID> [icon: layers]
-  UserDetailsService [icon: layers]
-  OncePerRequestFilter [icon: layers]
-  PasswordEncoder [icon: layers]
-  UsernamePasswordAuthenticationToken [icon: layers]
-}
+// Client → API
+Client > AuthController: HTTP POST /api/auth/signup  (SignupRequest DTO)
+Client > AuthController: HTTP POST /api/auth/login   (LoginRequest DTO)
+AuthController > Client: ResponseEntity<AuthResponse> + Authorization header
 
+// Security filter chain (runs before every controller method)
+SecurityConfig > JwtAuthenticationFilter: registers as pre-auth filter
+JwtAuthenticationFilter > JwtService: validate JWT, extract claims
 
-// ════════════════════════════════════════════════════════════════════════════
-// CONNECTIONS
-// ════════════════════════════════════════════════════════════════════════════
+// MVC → Business
+AuthController > AuthService: delegates signup() / login()
+AuthController > GlobalExceptionHandler: uncaught exceptions via @ControllerAdvice
+GlobalExceptionHandler > Client: ApiErrorResponse (4xx / 5xx)
 
-// ── External clients ──────────────────────────────────────────────────────
-Client > AuthController: POST /api/auth/signup (JSON: SignupRequest)
-Client > AuthController: POST /api/auth/login  (JSON: LoginRequest)
-Client > Swagger UI: browse API docs
+// Business → Security
+AuthService > JwtService: generateToken (userId, role, orgId)
+AuthService > SecurityConfig: BCryptPasswordEncoder (encode / matches)
+AuthService > AppUserDetailsService: toUserDetails(User) — shared helper
 
-// ── Swagger → config ──────────────────────────────────────────────────────
-Swagger UI > SwaggerConfig: reads OpenAPI bean
+// Business → DAO
+AuthService > UserRepository: existsByEmail / findByEmail / save
+AppUserDetailsService > UserRepository: findByEmail (Spring Security login)
 
-// ── Security filter chain ─────────────────────────────────────────────────
-SecurityConfig > JwtAuthenticationFilter: addFilterBefore UsernamePasswordAuthenticationFilter
-JwtAuthenticationFilter > JwtService: extractEmail(jwt)
-JwtAuthenticationFilter > JwtService: extractRole(jwt)
-JwtAuthenticationFilter > JwtService: isTokenValid(jwt, userDetails)
+// Business → Exception model
+AuthService > ApiException: throws typed domain exceptions
+GlobalExceptionHandler > ApiErrorResponse: builds structured error DTO
+GlobalExceptionHandler > ErrorType: error categorisation enum
 
-// ── Controller → DTOs ─────────────────────────────────────────────────────
-AuthController > SignupRequest: @Valid @RequestBody deserialise
-AuthController > LoginRequest: @RequestBody deserialise
-AuthController > AuthResponse: build ResponseEntity<AuthResponse>
+// DAO → Entity → DB
+UserRepository > User: Spring Data JPA CRUD operations
+User > PostgreSQL: Hibernate ORM — @Entity mapped to users table
+Role > PostgreSQL: stored as VARCHAR, chk_role constraint
+Flyway > PostgreSQL: applies V1 + V2 migrations on startup
 
-// ── Controller → Services ─────────────────────────────────────────────────
-AuthController > AuthService: signup(SignupRequest): AuthResponse
-AuthController > AuthService: login(LoginRequest): AuthResponse
-
-// ── Controller → Exception handler ────────────────────────────────────────
-AuthController > GlobalExceptionHandler: ApiException propagates via @ControllerAdvice
-
-// ── AuthService dependencies ──────────────────────────────────────────────
-AuthService > SecurityConfig: injects PasswordEncoder (BCryptPasswordEncoder)
-AuthService > JwtService: generateToken(userDetails, userId, role, orgId): String
-AuthService > AppUserDetailsService: toUserDetails(User) static call
-AuthService > UserRepository: existsByEmail(email): boolean
-AuthService > UserRepository: save(user): User
-AuthService > UserRepository: findByEmail(email): Optional<User>
-AuthService > ApiException: throws forbidden / conflict / authError / badRequest / internalError
-
-// ── AppUserDetailsService dependencies ───────────────────────────────────
-AppUserDetailsService > UserRepository: findByEmail(email): Optional<User>
-AppUserDetailsService > Spring Framework: implements UserDetailsService
-
-// ── JwtAuthenticationFilter extends Spring ─────────────────────────────
-JwtAuthenticationFilter > Spring Framework: extends OncePerRequestFilter
-
-// ── UserRepository → Spring JPA ───────────────────────────────────────────
-UserRepository > Spring Framework: extends JpaRepository<User, UUID>
-UserRepository > User: JPA entity operations (select insert update delete)
-
-// ── Entity → DB ───────────────────────────────────────────────────────────
-User > PostgreSQL DB: @Entity mapped to users table via Hibernate
-Role > PostgreSQL DB: stored as VARCHAR with chk_role constraint
-
-// ── Flyway → DB ───────────────────────────────────────────────────────────
-Flyway Migrations > PostgreSQL DB: V1 create users table on startup
-Flyway Migrations > PostgreSQL DB: V2 rename column on startup
-
-// ── Exception layer wiring ────────────────────────────────────────────────
-GlobalExceptionHandler > ApiErrorResponse: constructs structured error body
-GlobalExceptionHandler > ErrorType: categorises error
-ApiException > ErrorType: holds ErrorType enum value
-
-// ── Responses to client ───────────────────────────────────────────────────
-AuthController > Client: 201 Created  + Authorization header (Bearer token)
-AuthController > Client: 200 OK       + Authorization header (Bearer token)
-GlobalExceptionHandler > Client: 400/401/403/409/500 ApiErrorResponse JSON
+// API Docs
+Client > SwaggerConfig: GET /swagger-ui/** — OpenAPI docs
