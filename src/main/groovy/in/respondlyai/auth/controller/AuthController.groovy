@@ -7,6 +7,7 @@ import in.respondlyai.auth.exception.ApiErrorResponse
 import in.respondlyai.auth.service.AuthService
 
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.headers.Header
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.ExampleObject
 import io.swagger.v3.oas.annotations.media.Schema
@@ -42,7 +43,10 @@ class AuthController {
             @ApiResponse(
                     responseCode = "201",
                     description = "User created successfully",
-                    content = @Content(schema = @Schema(implementation = AuthResponse))
+                    content = @Content(schema = @Schema(implementation = AuthResponse)),
+                    headers = [
+                            @Header(name = "Authorization", description = "Bearer token for authentication", schema = @Schema(type = "string"))
+                    ]
             ),
             @ApiResponse(
                     responseCode = "400",
@@ -108,7 +112,10 @@ class AuthController {
             @ApiResponse(
                     responseCode = "200",
                     description = "Login successful",
-                    content = @Content(schema = @Schema(implementation = AuthResponse))
+                    content = @Content(schema = @Schema(implementation = AuthResponse)),
+                    headers = [
+                            @Header(name = "Authorization", description = "Bearer token for authentication", schema = @Schema(type = "string"))
+                    ]
             ),
             @ApiResponse(
                     responseCode = "400",

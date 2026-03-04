@@ -23,12 +23,14 @@ class AuthService {
     private final UserRepository userRepository
     private final PasswordEncoder passwordEncoder
     private final JwtService jwtService
+    private final ThunderMailService thunderMailService
 
     AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
-                JwtService jwtService) {
+                JwtService jwtService, ThunderMailService thunderMailService) {
         this.userRepository = userRepository
         this.passwordEncoder = passwordEncoder
         this.jwtService = jwtService
+        this.thunderMailService = thunderMailService
     }
 
 
@@ -94,6 +96,9 @@ class AuthService {
             String token = jwtService.generateToken(userDetails, savedUser.userId, savedUser.role.name(), savedUser.organizationId)
 
             log.info("User created successfully: userId={}", savedUser.userId)
+
+            // Send welcome email via ThunderMail
+            thunderMailService.sendWelcomeEmail(savedUser.email, savedUser.name)
 
             return new AuthResponse(
                     token,
