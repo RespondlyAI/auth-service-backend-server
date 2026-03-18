@@ -3,6 +3,7 @@ package in.respondlyai.auth.service
 import in.respondlyai.auth.dto.AuthResponse
 import in.respondlyai.auth.dto.LoginRequest
 import in.respondlyai.auth.dto.SignupRequest
+import in.respondlyai.auth.dto.VerifyOtpRequest
 import in.respondlyai.auth.entity.Role
 import in.respondlyai.auth.entity.User
 import in.respondlyai.auth.exception.ApiException
@@ -24,13 +25,15 @@ class AuthService {
     private final PasswordEncoder passwordEncoder
     private final JwtService jwtService
     private final ThunderMailService thunderMailService
+    private final OtpService otpService
 
     AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
-                JwtService jwtService, ThunderMailService thunderMailService) {
+                JwtService jwtService, ThunderMailService thunderMailService, OtpService otpService) {
         this.userRepository = userRepository
         this.passwordEncoder = passwordEncoder
         this.jwtService = jwtService
         this.thunderMailService = thunderMailService
+        this.otpService = otpService
     }
 
 
@@ -48,7 +51,6 @@ class AuthService {
         // Find user by email
         User user = userRepository.findByEmail(request.email)
                 .orElseThrow({ ApiException.authError("Invalid email..") })
-
         // Verify password
         if (!passwordEncoder.matches(request.password, user.password)) {
             throw ApiException.authError("Invalid password")
@@ -91,17 +93,14 @@ class AuthService {
 
             User savedUser = userRepository.save(user)
 
-            // Generate JWT token for the new user
-            UserDetails userDetails = AppUserDetailsService.toUserDetails(savedUser)
-            String token = jwtService.generateToken(userDetails, savedUser.userId, savedUser.role.name(), savedUser.organizationId)
+            String otp = otpService.generateAndStoreOtp(savedUser.email)
 
-            log.info("User created successfully: userId={}", savedUser.userId)
+            log.info("User created successfully (unverified): userId={}", savedUser.userId)
 
-            // Send welcome email via ThunderMail
-            thunderMailService.sendWelcomeEmail(savedUser.email, savedUser.name)
+            thunderMailService.sendOtpEmail(savedUser.email, otp)
 
             return new AuthResponse(
-                    token,
+                    null,
                     savedUser.getUserId(),
                     savedUser.getEmail(),
                     savedUser.getRole()

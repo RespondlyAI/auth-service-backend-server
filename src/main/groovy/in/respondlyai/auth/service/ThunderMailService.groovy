@@ -50,4 +50,28 @@ class ThunderMailService {
             log.error("Failed to send welcome email to {}: {}", toEmail, e.getMessage(), e)
         }
     }
+    void sendOtpEmail(String toEmail, String otp) {
+        try {
+            HttpHeaders headers = new HttpHeaders()
+            headers.setContentType(MediaType.APPLICATION_JSON)
+            headers.setBearerAuth(apiToken)
+
+            Map<String, Object> body = [
+                from: apiFrom,
+                to: toEmail,
+                subject: "Your RespondlyAI Verification Code",
+                html: "<h2>Your verification code is: " + otp + "</h2><p>It expires in 5 minutes.</p>"
+            ]
+
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers)
+
+            log.info("Sending OTP email via ThunderMail to: {}", toEmail)
+            
+            def response = restTemplate.exchange(apiUrl + "/emails", HttpMethod.POST, entity, Map.class)
+            
+            log.info("ThunderMail response for OTP: {}", response.body)
+        } catch (Exception e) {
+            log.error("Failed to send OTP email to {}: {}", toEmail, e.getMessage(), e)
+        }
+    }
 }
