@@ -51,6 +51,11 @@ class AuthService {
         // Find user by email
         User user = userRepository.findByEmail(request.email)
                 .orElseThrow({ ApiException.authError("Invalid email..") })
+        
+        if (!user.isVerified) {
+            throw ApiException.forbidden("Please verify your email using the OTP sent to you.")
+        }
+        
         // Verify password
         if (!passwordEncoder.matches(request.password, user.password)) {
             throw ApiException.authError("Invalid password")
@@ -110,5 +115,36 @@ class AuthService {
             log.error("Signup error: {}", ex.message)
             throw ApiException.internalError("Failed to create user account")
         }
+    }
+
+    @Transactional
+    AuthResponse verifyOtp(VerifyOtpRequest request) {
+        User user = userRepository.findByEmail(request.email)
+                .orElseThrow({ ApiException.authError("User not found") })
+
+        if (user.isVerified) {
+            throw ApiException.badRequest("User is already verified")
+        }
+
+        if (!otpService.validateOtp(request.email, request.otp)) {
+            throw ApiException.authError("Invalid or expired OTP")
+        }
+
+        user.isVerified = true
+        userRepository.save(user)
+
+        // Generate JWT token now that user is verified
+        UserDetails userDetails = AppUserDetailsService.toUserDetails(user)
+        String token = jwtService.generateToken(userDetails, user.userId, user.role.name(), user.organizationId)
+
+        log.info("User verified successfully: userId={}", user.userId)
+
+        // Return full AuthResponse with the valid JWT token
+        return new AuthResponse(
+                token,
+                user.getUserId(),
+                user.getEmail(),
+                user.getRole()
+        )
     }
 }

@@ -3,6 +3,7 @@ package in.respondlyai.auth.controller
 import in.respondlyai.auth.dto.SignupRequest
 import in.respondlyai.auth.dto.LoginRequest
 import in.respondlyai.auth.dto.AuthResponse
+import in.respondlyai.auth.dto.VerifyOtpRequest
 import in.respondlyai.auth.exception.ApiErrorResponse
 import in.respondlyai.auth.service.AuthService
 
@@ -99,6 +100,38 @@ class AuthController {
     ResponseEntity<AuthResponse> signup(@Valid @RequestBody SignupRequest request) {
         AuthResponse response = authService.signup(request)
         return ResponseEntity.status(HttpStatus.CREATED)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + response.getToken())
+                .body(response)
+    }
+
+    @PostMapping("/verify-otp")
+    @Operation(
+            summary = "Verify OTP",
+            description = "Verifies the 6-digit OTP sent to the user's email. Returns the JWT access token upon successful verification."
+    )
+    @ApiResponses([
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "OTP verified successfully",
+                    content = @Content(schema = @Schema(implementation = AuthResponse)),
+                    headers = [
+                            @Header(name = "Authorization", description = "Bearer token for authentication", schema = @Schema(type = "string"))
+                    ]
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Validation error or User already verified",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse))
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Invalid or expired OTP",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse))
+            )
+    ])
+    ResponseEntity<AuthResponse> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
+        AuthResponse response = authService.verifyOtp(request)
+        return ResponseEntity.ok()
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + response.getToken())
                 .body(response)
     }
