@@ -3,10 +3,12 @@ package in.respondlyai.auth.controller
 import in.respondlyai.auth.dto.SignupRequest
 import in.respondlyai.auth.dto.LoginRequest
 import in.respondlyai.auth.dto.AuthResponse
+import in.respondlyai.auth.dto.VerifyOtpRequest
 import in.respondlyai.auth.exception.ApiErrorResponse
 import in.respondlyai.auth.service.AuthService
 
 import io.swagger.v3.oas.annotations.Operation
+import io.swagger.v3.oas.annotations.headers.Header
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.ExampleObject
 import io.swagger.v3.oas.annotations.media.Schema
@@ -42,7 +44,10 @@ class AuthController {
             @ApiResponse(
                     responseCode = "201",
                     description = "User created successfully",
-                    content = @Content(schema = @Schema(implementation = AuthResponse))
+                    content = @Content(schema = @Schema(implementation = AuthResponse)),
+                    headers = [
+                            @Header(name = "Authorization", description = "Bearer token for authentication", schema = @Schema(type = "string"))
+                    ]
             ),
             @ApiResponse(
                     responseCode = "400",
@@ -99,6 +104,38 @@ class AuthController {
                 .body(response)
     }
 
+    @PostMapping("/verify-otp")
+    @Operation(
+            summary = "Verify OTP",
+            description = "Verifies the 6-digit OTP sent to the user's email. Returns the JWT access token upon successful verification."
+    )
+    @ApiResponses([
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "OTP verified successfully",
+                    content = @Content(schema = @Schema(implementation = AuthResponse)),
+                    headers = [
+                            @Header(name = "Authorization", description = "Bearer token for authentication", schema = @Schema(type = "string"))
+                    ]
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Validation error or User already verified",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse))
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Invalid or expired OTP",
+                    content = @Content(schema = @Schema(implementation = ApiErrorResponse))
+            )
+    ])
+    ResponseEntity<AuthResponse> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
+        AuthResponse response = authService.verifyOtp(request)
+        return ResponseEntity.ok()
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + response.getToken())
+                .body(response)
+    }
+
     @PostMapping("/login")
     @Operation(
             summary = "Login existing user",
@@ -108,7 +145,10 @@ class AuthController {
             @ApiResponse(
                     responseCode = "200",
                     description = "Login successful",
-                    content = @Content(schema = @Schema(implementation = AuthResponse))
+                    content = @Content(schema = @Schema(implementation = AuthResponse)),
+                    headers = [
+                            @Header(name = "Authorization", description = "Bearer token for authentication", schema = @Schema(type = "string"))
+                    ]
             ),
             @ApiResponse(
                     responseCode = "400",

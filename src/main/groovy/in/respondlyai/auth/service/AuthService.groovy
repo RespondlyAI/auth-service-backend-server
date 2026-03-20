@@ -3,6 +3,7 @@ package in.respondlyai.auth.service
 import in.respondlyai.auth.dto.AuthResponse
 import in.respondlyai.auth.dto.LoginRequest
 import in.respondlyai.auth.dto.SignupRequest
+import in.respondlyai.auth.dto.VerifyOtpRequest
 import in.respondlyai.auth.entity.Role
 import in.respondlyai.auth.entity.User
 import in.respondlyai.auth.exception.ApiException
@@ -23,12 +24,16 @@ class AuthService {
     private final UserRepository userRepository
     private final PasswordEncoder passwordEncoder
     private final JwtService jwtService
+    private final ThunderMailService thunderMailService
+    private final OtpService otpService
 
     AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
-                JwtService jwtService) {
+                JwtService jwtService, ThunderMailService thunderMailService, OtpService otpService) {
         this.userRepository = userRepository
         this.passwordEncoder = passwordEncoder
         this.jwtService = jwtService
+        this.thunderMailService = thunderMailService
+        this.otpService = otpService
     }
 
 
@@ -46,7 +51,11 @@ class AuthService {
         // Find user by email
         User user = userRepository.findByEmail(request.email)
                 .orElseThrow({ ApiException.authError("Invalid email..") })
-
+        
+        if (!user.isVerified) {
+            throw ApiException.forbidden("Please verify your email using the OTP sent to you.")
+        }
+        
         // Verify password
         if (!passwordEncoder.matches(request.password, user.password)) {
             throw ApiException.authError("Invalid password")
@@ -89,14 +98,13 @@ class AuthService {
 
             User savedUser = userRepository.save(user)
 
-            // Generate JWT token for the new user
-            UserDetails userDetails = AppUserDetailsService.toUserDetails(savedUser)
-            String token = jwtService.generateToken(userDetails, savedUser.userId, savedUser.role.name(), savedUser.organizationId)
+            String otp = otpService.generateAndStoreOtp(savedUser.userId)
+            log.info("User created successfully (unverified): userId={}", savedUser.userId)
 
-            log.info("User created successfully: userId={}", savedUser.userId)
+            thunderMailService.sendOtpEmail(savedUser.email, otp)
 
             return new AuthResponse(
-                    token,
+                    null,
                     savedUser.getUserId(),
                     savedUser.getEmail(),
                     savedUser.getRole()
@@ -106,5 +114,36 @@ class AuthService {
             log.error("Signup error: {}", ex.message)
             throw ApiException.internalError("Failed to create user account")
         }
+    }
+
+    @Transactional
+    AuthResponse verifyOtp(VerifyOtpRequest request) {
+        User user = userRepository.findByUserId(request.userId)
+                .orElseThrow({ ApiException.authError("User not found") })
+
+        if (user.isVerified) {
+            throw ApiException.badRequest("User is already verified")
+        }
+
+        if (!otpService.validateOtp(request.userId, request.otp)) {
+            throw ApiException.authError("Invalid or expired OTP")
+        }
+
+        user.isVerified = true
+        userRepository.save(user)
+
+        // Generate JWT token now that user is verified
+        UserDetails userDetails = AppUserDetailsService.toUserDetails(user)
+        String token = jwtService.generateToken(userDetails, user.userId, user.role.name(), user.organizationId)
+
+        log.info("User verified successfully: userId={}", user.userId)
+
+        // Return full AuthResponse with the valid JWT token
+        return new AuthResponse(
+                token,
+                user.getUserId(),
+                user.getEmail(),
+                user.getRole()
+        )
     }
 }
