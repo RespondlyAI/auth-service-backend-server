@@ -1,5 +1,6 @@
 package in.respondlyai.auth.dto
 
+import com.fasterxml.jackson.annotation.JsonProperty
 import in.respondlyai.auth.entity.Role
 import io.swagger.v3.oas.annotations.media.Schema
 
@@ -12,6 +13,7 @@ class AuthResponse {
     String type = "Bearer"
 
     @Schema(description = "User ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+    @JsonProperty("user_id")
     String id
 
     @Schema(description = "User email", example = "johndoe@gmail.com")

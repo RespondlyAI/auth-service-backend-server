@@ -98,8 +98,7 @@ class AuthService {
 
             User savedUser = userRepository.save(user)
 
-            String otp = otpService.generateAndStoreOtp(savedUser.email)
-
+            String otp = otpService.generateAndStoreOtp(savedUser.userId)
             log.info("User created successfully (unverified): userId={}", savedUser.userId)
 
             thunderMailService.sendOtpEmail(savedUser.email, otp)
@@ -119,14 +118,14 @@ class AuthService {
 
     @Transactional
     AuthResponse verifyOtp(VerifyOtpRequest request) {
-        User user = userRepository.findByEmail(request.email)
+        User user = userRepository.findByUserId(request.userId)
                 .orElseThrow({ ApiException.authError("User not found") })
 
         if (user.isVerified) {
             throw ApiException.badRequest("User is already verified")
         }
 
-        if (!otpService.validateOtp(request.email, request.otp)) {
+        if (!otpService.validateOtp(request.userId, request.otp)) {
             throw ApiException.authError("Invalid or expired OTP")
         }
 

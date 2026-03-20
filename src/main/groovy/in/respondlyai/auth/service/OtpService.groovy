@@ -20,19 +20,19 @@ class OtpService {
         this.redisTemplate = redisTemplate
     }
 
-    String generateAndStoreOtp(String email) {
+    String generateAndStoreOtp(String userId) {
         String otp = String.format("%06d", ThreadLocalRandom.current().nextInt(100000, 1000000))
-        String key = "otp:" + email
+        String key = "otp:" + userId
         
         // Save to Redis
         redisTemplate.opsForValue().set(key, otp, OTP_TTL_MINUTES, TimeUnit.MINUTES)
         
-        log.info("Generated OTP for email: {}", email)
+        log.info("Generated OTP for userId: {}", userId)
         return otp
     }
 
-    boolean validateOtp(String email, String otp) {
-        String key = "otp:" + email
+    boolean validateOtp(String userId, String otp) {
+        String key = "otp:" + userId
         String storedOtp = redisTemplate.opsForValue().get(key)
         
         if (storedOtp != null && storedOtp.equals(otp)) {
