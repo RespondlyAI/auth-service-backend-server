@@ -9,12 +9,9 @@ import java.time.LocalDateTime
 class User {
 
     @Id
-    @org.hibernate.annotations.UuidGenerator
-    @Column(name = "uuid", updatable = false, nullable = false)
-    UUID uuid
-
-    @Column(name = "user_id", nullable = false, unique = true)
-    String userId
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    @Column(name = "id", updatable = false, nullable = false)
+    UUID id
 
     @Column(name = "name", nullable = false)
     String name
@@ -28,12 +25,18 @@ class User {
     @Column(name = "is_verified", nullable = false)
     Boolean isVerified = false
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "role")
-    Role role = Role.OWNER
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "role_id", nullable = false)
+    Role role
 
     @Column(name = "organization_id")
     String organizationId
+
+    @Column(name = "last_login_at")
+    LocalDateTime lastLoginAt
+
+    @Column(name = "password_updated_at")
+    LocalDateTime passwordUpdatedAt
 
     @Column(name = "created_at", nullable = false, updatable = false)
     LocalDateTime createdAt
@@ -43,13 +46,12 @@ class User {
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now()
-        updatedAt = LocalDateTime.now()
+        if (createdAt == null) createdAt = LocalDateTime.now()
+        if (updatedAt == null) updatedAt = LocalDateTime.now()
     }
 
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now()
     }
-
 }
