@@ -114,14 +114,14 @@ class AuthService {
 
     @Transactional
     AuthResponse verifyOtp(VerifyOtpRequest request) {
-        User user = userRepository.findById(request.userId)
+        User user = userRepository.findById(request.id)
                 .orElseThrow({ ApiException.authError("User not found") })
 
         if (user.isVerified) {
             throw ApiException.badRequest("User is already verified")
         }
 
-        if (!otpService.validateOtp(request.userId.toString(), request.otp)) {
+        if (!otpService.validateOtp(request.id.toString(), request.otp)) {
             throw ApiException.authError("Invalid or expired OTP")
         }
 

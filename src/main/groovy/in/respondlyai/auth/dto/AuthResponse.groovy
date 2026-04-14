@@ -15,8 +15,8 @@ class AuthResponse {
     @Schema(description = "Token type", example = "Bearer")
     String type = "Bearer"
 
-    @Schema(description = "User ID")
-    @JsonProperty("user_id")
+    @Schema(description = "User's primary UUID")
+    @JsonProperty("id")
     UUID id
 
     @Schema(description = "User email")
