@@ -4,8 +4,8 @@ import jakarta.persistence.*
 import java.util.UUID
 
 @Entity
-@Table(name = "roles")
-class Role {
+@Table(name = "token_types")
+class TokenType {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
@@ -14,9 +14,9 @@ class Role {
     @Column(unique = true, nullable = false)
     String name
 
-    Role() {}
+    TokenType() {}
 
-    Role(String name) {
+    TokenType(String name) {
         this.name = name
     }
 }
