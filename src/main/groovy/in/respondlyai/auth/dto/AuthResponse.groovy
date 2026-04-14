@@ -1,29 +1,33 @@
 package in.respondlyai.auth.dto
 
 import com.fasterxml.jackson.annotation.JsonProperty
-import in.respondlyai.auth.entity.Role
 import io.swagger.v3.oas.annotations.media.Schema
+import java.util.UUID
 
 @Schema(description = "Authentication response")
 class AuthResponse {
-    @Schema(description = "JWT access token", example = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
+    @Schema(description = "JWT access token")
     String token
+
+    @Schema(description = "JWT refresh token")
+    String refreshToken
 
     @Schema(description = "Token type", example = "Bearer")
     String type = "Bearer"
 
-    @Schema(description = "User ID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+    @Schema(description = "User ID")
     @JsonProperty("user_id")
-    String id
+    UUID id
 
-    @Schema(description = "User email", example = "johndoe@gmail.com")
+    @Schema(description = "User email")
     String email
 
-    @Schema(description = "User role", example = "OWNER")
-    Role role
+    @Schema(description = "User role")
+    String role
 
-    AuthResponse(String token, String id, String email, Role role) {
+    AuthResponse(String token, String refreshToken, UUID id, String email, String role) {
         this.token = token
+        this.refreshToken = refreshToken
         this.id = id
         this.email = email
         this.role = role
