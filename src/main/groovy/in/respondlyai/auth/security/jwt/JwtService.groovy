@@ -1,5 +1,6 @@
 package in.respondlyai.auth.security.jwt
 
+import in.respondlyai.auth.entity.User
 import io.jsonwebtoken.Claims
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.security.Keys
@@ -23,6 +24,9 @@ class JwtService {
 
     @Value('${application.security.jwt.expiration}')
     private long jwtExpiration
+
+    @Value('${application.security.jwt.refresh-token.expiration}')
+    private long refreshExpiration
 
     private SecretKey signingKey
 
@@ -53,25 +57,36 @@ class JwtService {
     }
 
     /**
-     * Generates a new JWT token for a specific user.
+     * Generates a new access JWT token for a specific user.
      */
-    String generateToken(UserDetails userDetails, String userId, String role, String organizationId) {
+    String generateAccessToken(User user, UserDetails userDetails) {
         Map<String, Object> claims = new HashMap<>()
-        claims.put("role", role)
-        claims.put("userId", userId)
-        if (organizationId) {
-            claims.put("organizationId", organizationId)
+        claims.put("userId", user.id.toString())
+        claims.put("role", user.role.name)
+        if (user.organizationId) {
+            claims.put("orgId", user.organizationId)
         }
-        return generateToken(claims, userDetails)
+        claims.put("type", "access")
+        return buildToken(claims, userDetails, jwtExpiration)
     }
 
-    String generateToken(Map<String, Object> extraClaims, UserDetails userDetails) {
+    /**
+     * Generates a new refresh JWT token for a specific user.
+     */
+    String generateRefreshToken(User user, UserDetails userDetails) {
+        Map<String, Object> claims = new HashMap<>()
+        claims.put("userId", user.id.toString())
+        claims.put("type", "refresh")
+        return buildToken(claims, userDetails, refreshExpiration)
+    }
+
+    private String buildToken(Map<String, Object> extraClaims, UserDetails userDetails, long expiration) {
         return Jwts.builder()
                 .claims(extraClaims)
                 .subject(userDetails.getUsername()) // userDetails.getUsername() returns email
                 .issuedAt(new Date(System.currentTimeMillis()))
-                .expiration(new Date(System.currentTimeMillis() + jwtExpiration))
-                .signWith(getSignInKey())
+                .expiration(new Date(System.currentTimeMillis() + expiration))
+                .signWith(signingKey)
                 .compact()
     }
 
@@ -81,13 +96,6 @@ class JwtService {
     boolean isTokenValid(String token, UserDetails userDetails) {
         final String email = extractEmail(token)
         return email?.equals(userDetails.getUsername()) && !isTokenExpired(token)
-    }
-
-    /**
-     * Extracts the role name from the JWT token's custom claims.
-     */
-    String extractRole(String token) {
-        return (String) extractClaim(token, { Claims claims -> claims.get("role") })
     }
 
     private boolean isTokenExpired(String token) {
@@ -103,16 +111,9 @@ class JwtService {
      */
     private Claims extractAllClaims(String token) {
         return Jwts.parser()
-                .verifyWith(getSignInKey())
+                .verifyWith(signingKey)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload()
-    }
-
-    /**
-     * Returns the cached signing key, pre-validated at startup.
-     */
-    private SecretKey getSignInKey() {
-        return signingKey
     }
 }

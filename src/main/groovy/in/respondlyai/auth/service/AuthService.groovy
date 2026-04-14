@@ -1,13 +1,9 @@
 package in.respondlyai.auth.service
 
-import in.respondlyai.auth.dto.AuthResponse
-import in.respondlyai.auth.dto.LoginRequest
-import in.respondlyai.auth.dto.SignupRequest
-import in.respondlyai.auth.dto.VerifyOtpRequest
-import in.respondlyai.auth.entity.Role
-import in.respondlyai.auth.entity.User
+import in.respondlyai.auth.dto.*
+import in.respondlyai.auth.entity.*
 import in.respondlyai.auth.exception.ApiException
-import in.respondlyai.auth.repository.UserRepository
+import in.respondlyai.auth.repository.*
 import in.respondlyai.auth.security.jwt.JwtService
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -15,6 +11,8 @@ import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.LocalDateTime
+import java.time.ZoneId
 
 @Service
 class AuthService {
@@ -22,22 +20,29 @@ class AuthService {
     private static final Logger log = LoggerFactory.getLogger(AuthService)
 
     private final UserRepository userRepository
+    private final RoleRepository roleRepository
+    private final TokenRepository tokenRepository
+    private final TokenTypeRepository tokenTypeRepository
     private final PasswordEncoder passwordEncoder
     private final JwtService jwtService
     private final ThunderMailService thunderMailService
     private final OtpService otpService
 
-    AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder,
-                JwtService jwtService, ThunderMailService thunderMailService, OtpService otpService) {
+    AuthService(UserRepository userRepository, RoleRepository roleRepository,
+                TokenRepository tokenRepository, TokenTypeRepository tokenTypeRepository,
+                PasswordEncoder passwordEncoder, JwtService jwtService,
+                ThunderMailService thunderMailService, OtpService otpService) {
         this.userRepository = userRepository
+        this.roleRepository = roleRepository
+        this.tokenRepository = tokenRepository
+        this.tokenTypeRepository = tokenTypeRepository
         this.passwordEncoder = passwordEncoder
         this.jwtService = jwtService
         this.thunderMailService = thunderMailService
         this.otpService = otpService
     }
 
-
-    @Transactional(readOnly = true)
+    @Transactional
     AuthResponse login(LoginRequest request) {
         // Manual simplified validation
         if (!request.email || !request.password) {
@@ -50,64 +55,55 @@ class AuthService {
 
         // Find user by email
         User user = userRepository.findByEmail(request.email)
-                .orElseThrow({ ApiException.authError("Invalid email..") })
-        
-        if (!user.isVerified) {
-            throw ApiException.forbidden("Please verify your email using the OTP sent to you.")
-        }
-        
-        // Verify password
+                .orElseThrow({ ApiException.authError("Invalid email") })
+
         if (!passwordEncoder.matches(request.password, user.password)) {
             throw ApiException.authError("Invalid password")
         }
 
-        // Generate JWT token
-        UserDetails userDetails = AppUserDetailsService.toUserDetails(user)
-        String token = jwtService.generateToken(userDetails, user.userId, user.role.name(), user.organizationId)
+        if (!user.isVerified) {
+            throw ApiException.forbidden("Please verify your email using the OTP sent to you.")
+        }
 
-        log.info("User logged in successfully: userId={}, email={}", user.userId, user.email)
+        // Update last login
+        user.lastLoginAt = LocalDateTime.now()
+        userRepository.save(user)
 
-        return new AuthResponse(
-                token,
-                user.getUserId(),
-                user.getEmail(),
-                user.getRole()
-        )
+        log.info("User logged in successfully: userId={}, email={}", user.id, user.email)
+
+        return generateAuthResponse(user)
     }
 
     @Transactional
     AuthResponse signup(SignupRequest request) {
-
-        // Only OWNER role can signup
-        if (request.role != Role.OWNER) {
-            throw ApiException.forbidden("Only users with role OWNER can signup")
-        }
-
         // Check for existing email
         if (userRepository.existsByEmail(request.email)) {
             throw ApiException.conflict("Email already in use")
         }
 
         try {
+            Role ownerRole = roleRepository.findByName("OWNER")
+                    .orElseThrow({ ApiException.internalError("Default roles not initialized") })
+
             User user = new User()
-            user.setUserId(UUID.randomUUID().toString())
             user.setName(request.name)
             user.setEmail(request.email)
             user.setPassword(passwordEncoder.encode(request.password))
-            user.setRole(Role.OWNER)
+            user.setRole(ownerRole)
 
             User savedUser = userRepository.save(user)
 
-            String otp = otpService.generateAndStoreOtp(savedUser.userId)
-            log.info("User created successfully (unverified): userId={}", savedUser.userId)
+            String otp = otpService.generateAndStoreOtp(savedUser.id.toString())
+            log.info("User created successfully (unverified): userId={}", savedUser.id)
 
             thunderMailService.sendOtpEmail(savedUser.email, otp)
 
             return new AuthResponse(
                     null,
-                    savedUser.getUserId(),
-                    savedUser.getEmail(),
-                    savedUser.getRole()
+                    null,
+                    savedUser.id,
+                    savedUser.email,
+                    savedUser.role.name
             )
         } catch (Exception ex) {
             if (ex instanceof ApiException) throw ex
@@ -118,32 +114,91 @@ class AuthService {
 
     @Transactional
     AuthResponse verifyOtp(VerifyOtpRequest request) {
-        User user = userRepository.findByUserId(request.userId)
+        User user = userRepository.findById(request.userId)
                 .orElseThrow({ ApiException.authError("User not found") })
 
         if (user.isVerified) {
             throw ApiException.badRequest("User is already verified")
         }
 
-        if (!otpService.validateOtp(request.userId, request.otp)) {
+        if (!otpService.validateOtp(request.userId.toString(), request.otp)) {
             throw ApiException.authError("Invalid or expired OTP")
         }
 
         user.isVerified = true
         userRepository.save(user)
 
-        // Generate JWT token now that user is verified
+        log.info("User verified successfully: userId={}", user.id)
+
+        return generateAuthResponse(user)
+    }
+
+    // Helper method to generate access and refresh tokens and save them to DB
+    private AuthResponse generateAuthResponse(User user) {
         UserDetails userDetails = AppUserDetailsService.toUserDetails(user)
-        String token = jwtService.generateToken(userDetails, user.userId, user.role.name(), user.organizationId)
+        String accessToken = jwtService.generateAccessToken(user, userDetails)
+        String refreshToken = jwtService.generateRefreshToken(user, userDetails)
 
-        log.info("User verified successfully: userId={}", user.userId)
+        TokenType refreshType = tokenTypeRepository.findByName("REFRESH")
+                .orElseThrow({ ApiException.internalError("Token types not initialized") })
 
-        // Return full AuthResponse with the valid JWT token
+        Token tokenEntity = new Token()
+        tokenEntity.user = user
+        tokenEntity.token = refreshToken
+        tokenEntity.status = TokenStatus.active
+        tokenEntity.tokenType = refreshType
+        tokenEntity.expiresAt = LocalDateTime.now().plusWeeks(1) // 7 days
+        
+        tokenRepository.save(tokenEntity)
+
         return new AuthResponse(
-                token,
-                user.getUserId(),
-                user.getEmail(),
-                user.getRole()
+                accessToken,
+                refreshToken,
+                user.id,
+                user.email,
+                user.role.name
         )
+    }
+
+    @Transactional
+    AuthResponse refreshToken(String refreshToken) {
+        // Step 1: Basic JWT validation
+        String email = jwtService.extractEmail(refreshToken)
+        User user = userRepository.findByEmail(email)
+                .orElseThrow({ ApiException.authError("Invalid session") })
+
+        // Step 2: Fetch token from DB
+        Token tokenEntity = tokenRepository.findByToken(refreshToken)
+                .orElseThrow({ ApiException.authError("Token not found or fake") })
+
+        // Step 3: Check status and expiry
+        if (tokenEntity.status != TokenStatus.active) {
+            log.warn("Attempt to use a non-active token: userId={}, status={}", user.id, tokenEntity.status)
+            throw ApiException.authError("Token has been revoked or already used")
+        }
+
+        if (tokenEntity.expiresAt.isBefore(LocalDateTime.now())) {
+            tokenEntity.status = TokenStatus.expired
+            tokenRepository.save(tokenEntity)
+            throw ApiException.authError("Token has expired")
+        }
+
+        // Step 4: Token Rotation (Revoke old, Issuing new)
+        tokenEntity.status = TokenStatus.used
+        tokenEntity.usedAt = LocalDateTime.now()
+        tokenRepository.save(tokenEntity)
+
+        log.info("Rotating refresh token for user: userId={}", user.id)
+        return generateAuthResponse(user)
+    }
+
+    @Transactional
+    void logout(String refreshToken) {
+        Token tokenEntity = tokenRepository.findByToken(refreshToken)
+                .orElseThrow({ ApiException.authError("Token not found") })
+
+        tokenEntity.status = TokenStatus.revoked
+        tokenRepository.save(tokenEntity)
+        log.info("User logged out successfully: userId={}", tokenEntity.user.id)
     }
 }
