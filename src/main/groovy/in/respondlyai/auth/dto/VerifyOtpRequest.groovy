@@ -1,17 +1,19 @@
 package in.respondlyai.auth.dto
 
-import com.fasterxml.jackson.annotation.JsonProperty
+import io.swagger.v3.oas.annotations.media.Schema
 import jakarta.validation.constraints.NotBlank
-import jakarta.validation.constraints.Size
+import jakarta.validation.constraints.NotNull
+import java.util.UUID
 
+@Schema(description = "OTP verification request")
 class VerifyOtpRequest {
 
-    @NotBlank(message = "user_id is required")
-    @JsonProperty("user_id")
-    String userId
+    @Schema(description = "User's primary UUID", example = "a1b2c3d4-e5f6-7890-abcd-ef1234567890")
+    @NotNull(message = "ID is required")
+    UUID id
 
+    @Schema(description = "6-digit OTP code", example = "123456")
     @NotBlank(message = "OTP is required")
-    @Size(min = 6, max = 6, message = "OTP must be exactly 6 digits")
     String otp
 
 }

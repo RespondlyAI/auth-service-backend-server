@@ -17,6 +17,5 @@ class LoginRequest {
     @io.swagger.v3.oas.annotations.media.Schema(description = "User password", example = "Password123!")
     @NotBlank(message = "Password is required")
     @Size(min = 6, max = 40, message = "Password must be between 6 and 40 characters")
-    @Pattern(regexp= '^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$' , message="enter valid password only")
     String password
 }

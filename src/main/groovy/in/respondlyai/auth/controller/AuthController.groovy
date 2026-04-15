@@ -1,12 +1,8 @@
 package in.respondlyai.auth.controller
 
-import in.respondlyai.auth.dto.SignupRequest
-import in.respondlyai.auth.dto.LoginRequest
-import in.respondlyai.auth.dto.AuthResponse
-import in.respondlyai.auth.dto.VerifyOtpRequest
+import in.respondlyai.auth.dto.*
 import in.respondlyai.auth.exception.ApiErrorResponse
 import in.respondlyai.auth.service.AuthService
-
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.headers.Header
 import io.swagger.v3.oas.annotations.media.Content
@@ -15,7 +11,6 @@ import io.swagger.v3.oas.annotations.media.Schema
 import io.swagger.v3.oas.annotations.responses.ApiResponse
 import io.swagger.v3.oas.annotations.responses.ApiResponses
 import io.swagger.v3.oas.annotations.tags.Tag
-
 import jakarta.validation.Valid
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
@@ -34,149 +29,62 @@ class AuthController {
     }
 
     @PostMapping("/signup")
-    @Operation(
-            summary = "Register a new user",
-            description = "Creates a new user account. Only users with role OWNER can signup. Email must be a valid @gmail.com address."
-    )
-
-// api docs
+    @Operation(summary = "Register a new user", description = "Creates a new user account. Only users with role OWNER can signup.")
     @ApiResponses([
-            @ApiResponse(
-                    responseCode = "201",
-                    description = "User created successfully",
-                    content = @Content(schema = @Schema(implementation = AuthResponse)),
-                    headers = [
-                            @Header(name = "Authorization", description = "Bearer token for authentication", schema = @Schema(type = "string"))
-                    ]
-            ),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Validation error",
-                    content = @Content(
-                            schema = @Schema(implementation = ApiErrorResponse),
-                            examples = @ExampleObject(
-                                    name = "Validation Error",
-                                    value = '{"success":false,"message":"Name is required, Password must be between 6 and 40 characters","type":"VALIDATION_ERROR","timestamp":"2026-02-21T14:30:00.000Z"}'
-                            )
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "403",
-                    description = "Forbidden — only OWNER role allowed",
-                    content = @Content(
-                            schema = @Schema(implementation = ApiErrorResponse),
-                            examples = @ExampleObject(
-                                    name = "Forbidden",
-                                    value = '{"success":false,"message":"Only users with role OWNER can signup","type":"FORBIDDEN","timestamp":"2026-02-21T14:30:00.000Z"}'
-                            )
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "409",
-                    description = "Conflict — email already in use",
-                    content = @Content(
-                            schema = @Schema(implementation = ApiErrorResponse),
-                            examples = @ExampleObject(
-                                    name = "Conflict",
-                                    value = '{"success":false,"message":"Email already in use","type":"CONFLICT","timestamp":"2026-02-21T14:30:00.000Z"}'
-                            )
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "500",
-                    description = "Internal server error",
-                    content = @Content(
-                            schema = @Schema(implementation = ApiErrorResponse),
-                            examples = @ExampleObject(
-                                    name = "Internal Error",
-                                    value = '{"success":false,"message":"Failed to create user account","type":"INTERNAL_SERVER_ERROR","timestamp":"2026-02-21T14:30:00.000Z"}'
-                            )
-                    )
-            )
+            @ApiResponse(responseCode = "201", description = "User created successfully", content = @Content(schema = @Schema(implementation = AuthResponse))),
+            @ApiResponse(responseCode = "400", description = "Validation error", content = @Content(schema = @Schema(implementation = ApiErrorResponse))),
+            @ApiResponse(responseCode = "403", description = "Forbidden — only OWNER role allowed", content = @Content(schema = @Schema(implementation = ApiErrorResponse))),
+            @ApiResponse(responseCode = "409", description = "Conflict — email already in use", content = @Content(schema = @Schema(implementation = ApiErrorResponse)))
     ])
-
-
-
     ResponseEntity<AuthResponse> signup(@Valid @RequestBody SignupRequest request) {
         AuthResponse response = authService.signup(request)
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + response.getToken())
-                .body(response)
+        return ResponseEntity.status(HttpStatus.CREATED).body(response)
     }
 
     @PostMapping("/verify-otp")
-    @Operation(
-            summary = "Verify OTP",
-            description = "Verifies the 6-digit OTP sent to the user's email. Returns the JWT access token upon successful verification."
-    )
+    @Operation(summary = "Verify OTP", description = "Verifies the 6-digit OTP and returns tokens.")
     @ApiResponses([
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "OTP verified successfully",
-                    content = @Content(schema = @Schema(implementation = AuthResponse)),
-                    headers = [
-                            @Header(name = "Authorization", description = "Bearer token for authentication", schema = @Schema(type = "string"))
-                    ]
-            ),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Validation error or User already verified",
-                    content = @Content(schema = @Schema(implementation = ApiErrorResponse))
-            ),
-            @ApiResponse(
-                    responseCode = "401",
-                    description = "Invalid or expired OTP",
-                    content = @Content(schema = @Schema(implementation = ApiErrorResponse))
-            )
+            @ApiResponse(responseCode = "200", description = "OTP verified successfully", content = @Content(schema = @Schema(implementation = AuthResponse))),
+            @ApiResponse(responseCode = "401", description = "Invalid or expired OTP", content = @Content(schema = @Schema(implementation = ApiErrorResponse)))
     ])
     ResponseEntity<AuthResponse> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
         AuthResponse response = authService.verifyOtp(request)
         return ResponseEntity.ok()
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + response.getToken())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + response.token)
                 .body(response)
     }
 
     @PostMapping("/login")
-    @Operation(
-            summary = "Login existing user",
-            description = "Authenticates a user with email and password and returns access token."
-    )
+    @Operation(summary = "Login existing user", description = "Authenticates user and returns access and refresh tokens.")
     @ApiResponses([
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Login successful",
-                    content = @Content(schema = @Schema(implementation = AuthResponse)),
-                    headers = [
-                            @Header(name = "Authorization", description = "Bearer token for authentication", schema = @Schema(type = "string"))
-                    ]
-            ),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Bad request — missing or invalid credentials",
-                    content = @Content(
-                            schema = @Schema(implementation = ApiErrorResponse),
-                            examples = @ExampleObject(
-                                    name = "Bad Request",
-                                    value = '{"success":false,"message":"Email and password are required","type":"BAD_REQUEST","timestamp":"2026-02-21T14:30:00.000Z"}'
-                            )
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "401",
-                    description = "Unauthorized — invalid credentials",
-                    content = @Content(
-                            schema = @Schema(implementation = ApiErrorResponse),
-                            examples = @ExampleObject(
-                                    name = "Unauthorized",
-                                    value = '{"success":false,"message":"Invalid email or password","type":"UNAUTHORIZED","timestamp":"2026-02-21T14:30:00.000Z"}'
-                            )
-                    )
-            )
+            @ApiResponse(responseCode = "200", description = "Login successful", content = @Content(schema = @Schema(implementation = AuthResponse))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized — invalid credentials", content = @Content(schema = @Schema(implementation = ApiErrorResponse)))
     ])
-    ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
+    ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         AuthResponse response = authService.login(request)
         return ResponseEntity.ok()
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + response.getToken())
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + response.token)
                 .body(response)
+    }
+
+    @PostMapping("/refresh")
+    @Operation(summary = "Refresh access token", description = "Uses a valid refresh token to generate a new pair of tokens.")
+    @ApiResponses([
+            @ApiResponse(responseCode = "200", description = "Token refreshed successfully", content = @Content(schema = @Schema(implementation = AuthResponse))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized — invalid or expired refresh token", content = @Content(schema = @Schema(implementation = ApiErrorResponse)))
+    ])
+    ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
+        AuthResponse response = authService.refreshToken(request.refreshToken)
+        return ResponseEntity.ok()
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + response.token)
+                .body(response)
+    }
+
+    @PostMapping("/logout")
+    @Operation(summary = "Logout user", description = "Revokes the provided refresh token.")
+    @ApiResponse(responseCode = "204", description = "Logged out successfully")
+    ResponseEntity<Void> logout(@Valid @RequestBody RefreshTokenRequest request) {
+        authService.logout(request.refreshToken)
+        return ResponseEntity.noContent().build()
     }
 }

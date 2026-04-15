@@ -1,36 +1,29 @@
 package in.respondlyai.auth.dto
 
-import in.respondlyai.auth.entity.Role
+import io.swagger.v3.oas.annotations.media.Schema
 import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
-import jakarta.validation.constraints.Size
-import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Pattern
-import io.swagger.v3.oas.annotations.media.Schema
+import jakarta.validation.constraints.Size
 
-
-@Schema(description = "Signup request payload")
+@Schema(description = "Signup request")
 class SignupRequest {
 
-    @NotBlank(message = "Name is required")
-    @Size(min = 3, max = 20, message = "Name must be between 3 and 20 characters")
     @Schema(description = "User's full name", example = "John Doe")
+    @NotBlank(message = "Name is required")
     String name
 
+    @Schema(description = "User's email (Gmail only)", example = "johndoe@gmail.com")
     @NotBlank(message = "Email is required")
-    @Size(max = 50, message = "Email must be less than 50 characters")
-    @Email
-    @Pattern(regexp = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$', message = "enter valid mail id only")
-    @Schema(description = "Gmail address", example = "johndoe@gmail.com")
+    @Email(message = "Invalid email format")
+    @Pattern(regexp = '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$')
     String email
 
+    @Schema(description = "User's password", example = "password123")
     @NotBlank(message = "Password is required")
     @Size(min = 6, max = 40, message = "Password must be between 6 and 40 characters")
-    @Schema(description = "Account password", example = "Str0ngP@ss")
-    @Pattern(regexp= '^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$' , message="enter valid password only")
     String password
 
-    @NotNull(message = "Role is required")
-    @Schema(description = "User role", example = "OWNER")
-    Role role
+    @Schema(description = "User's role (defaults to OWNER for signup)", example = "OWNER")
+    String role = "OWNER"
 }
