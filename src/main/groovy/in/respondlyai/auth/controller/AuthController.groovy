@@ -52,6 +52,18 @@ class AuthController {
         return ResponseEntity.ok(Map.of("message", "OTP verified successfully. Please login to continue."))
     }
 
+    @PostMapping("/resend-otp")
+    @Operation(summary = "Resend OTP", description = "Resends the 6-digit OTP to the user's email if they are not verified.")
+    @ApiResponses([
+            @ApiResponse(responseCode = "200", description = "OTP resent successfully"),
+            @ApiResponse(responseCode = "400", description = "User is already verified", content = @Content(schema = @Schema(implementation = ApiErrorResponse))),
+            @ApiResponse(responseCode = "401", description = "User not found", content = @Content(schema = @Schema(implementation = ApiErrorResponse)))
+    ])
+    ResponseEntity<Map<String, String>> resendOtp(@Valid @RequestBody ResendOtpRequest request) {
+        authService.resendOtp(request)
+        return ResponseEntity.ok(Map.of("message", "OTP resent successfully. Please check your email."))
+    }
+
     @PostMapping("/login")
     @Operation(summary = "Login existing user", description = "Authenticates user and returns access and refresh tokens.")
     @ApiResponses([
