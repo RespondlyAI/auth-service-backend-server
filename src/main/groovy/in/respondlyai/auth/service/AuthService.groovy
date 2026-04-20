@@ -143,6 +143,21 @@ class AuthService {
         log.info("User verified successfully: userId={}", user.id)
     }
 
+    @Transactional
+    void resendOtp(ResendOtpRequest request) {
+        User user = userRepository.findByEmail(request.email)
+                .orElseThrow({ ApiException.authError("User not found") })
+
+        if (user.isVerified) {
+            throw ApiException.badRequest("User is already verified")
+        }
+
+        String otp = otpService.generateAndStoreOtp(user.id.toString())
+        log.info("Resending OTP for user: userId={}", user.id)
+
+        thunderMailService.sendOtpEmail(user.email, otp)
+    }
+
     // Helper method to generate access and refresh tokens and save them to DB
     private AuthResponse generateAuthResponse(User user) {
         UserDetails userDetails = AppUserDetailsService.toUserDetails(user)
