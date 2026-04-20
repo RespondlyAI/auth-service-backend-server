@@ -28,6 +28,12 @@ class AuthService {
     private final ThunderMailService thunderMailService
     private final OtpService otpService
 
+    @org.springframework.beans.factory.annotation.Value('${application.security.jwt.expiration}')
+    private long jwtExpiration
+
+    @org.springframework.beans.factory.annotation.Value('${application.security.jwt.refresh-token.expiration}')
+    private long refreshExpiration
+
     AuthService(UserRepository userRepository, RoleRepository roleRepository,
                 TokenRepository tokenRepository, TokenTypeRepository tokenTypeRepository,
                 PasswordEncoder passwordEncoder, JwtService jwtService,
@@ -119,7 +125,7 @@ class AuthService {
     }
 
     @Transactional
-    AuthResponse verifyOtp(VerifyOtpRequest request) {
+    void verifyOtp(VerifyOtpRequest request) {
         User user = userRepository.findById(request.id)
                 .orElseThrow({ ApiException.authError("User not found") })
 
@@ -135,8 +141,6 @@ class AuthService {
         userRepository.save(user)
 
         log.info("User verified successfully: userId={}", user.id)
-
-        return generateAuthResponse(user)
     }
 
     // Helper method to generate access and refresh tokens and save them to DB
@@ -145,17 +149,26 @@ class AuthService {
         String accessToken = jwtService.generateAccessToken(user, userDetails)
         String refreshToken = jwtService.generateRefreshToken(user, userDetails)
 
+        TokenType accessType = tokenTypeRepository.findByName("ACCESS")
+                .orElseThrow({ ApiException.internalError("Token types not initialized") })
         TokenType refreshType = tokenTypeRepository.findByName("REFRESH")
                 .orElseThrow({ ApiException.internalError("Token types not initialized") })
 
-        Token tokenEntity = new Token()
-        tokenEntity.user = user
-        tokenEntity.token = refreshToken
-        tokenEntity.status = TokenStatus.active
-        tokenEntity.tokenType = refreshType
-        tokenEntity.expiresAt = LocalDateTime.now().plusWeeks(1) // 7 days
-        
-        tokenRepository.save(tokenEntity)
+        Token accessTokenEntity = new Token()
+        accessTokenEntity.user = user
+        accessTokenEntity.token = accessToken
+        accessTokenEntity.status = TokenStatus.active
+        accessTokenEntity.tokenType = accessType
+        accessTokenEntity.expiresAt = LocalDateTime.now().plusSeconds(jwtExpiration / 1000)
+        tokenRepository.save(accessTokenEntity)
+
+        Token refreshTokenEntity = new Token()
+        refreshTokenEntity.user = user
+        refreshTokenEntity.token = refreshToken
+        refreshTokenEntity.status = TokenStatus.active
+        refreshTokenEntity.tokenType = refreshType
+        refreshTokenEntity.expiresAt = LocalDateTime.now().plusSeconds(refreshExpiration / 1000)
+        tokenRepository.save(refreshTokenEntity)
 
         return new AuthResponse(
                 accessToken,
@@ -180,22 +193,38 @@ class AuthService {
         // Step 3: Check status and expiry
         if (tokenEntity.status != TokenStatus.active) {
             log.warn("Attempt to use a non-active token: userId={}, status={}", user.id, tokenEntity.status)
+            tokenRepository.delete(tokenEntity)
             throw ApiException.authError("Token has been revoked or already used")
         }
 
         if (tokenEntity.expiresAt.isBefore(LocalDateTime.now())) {
-            tokenEntity.status = TokenStatus.expired
-            tokenRepository.save(tokenEntity)
+            tokenRepository.delete(tokenEntity)
             throw ApiException.authError("Token has expired")
         }
 
-        // Step 4: Token Rotation (Revoke old, Issuing new)
-        tokenEntity.status = TokenStatus.used
-        tokenEntity.usedAt = LocalDateTime.now()
-        tokenRepository.save(tokenEntity)
+        log.info("Issuing new access token for user: userId={}", user.id)
 
-        log.info("Rotating refresh token for user: userId={}", user.id)
-        return generateAuthResponse(user)
+        UserDetails userDetails = AppUserDetailsService.toUserDetails(user)
+        String newAccessToken = jwtService.generateAccessToken(user, userDetails)
+
+        TokenType accessType = tokenTypeRepository.findByName("ACCESS")
+                .orElseThrow({ ApiException.internalError("Token types not initialized") })
+        
+        Token accessTokenEntity = new Token()
+        accessTokenEntity.user = user
+        accessTokenEntity.token = newAccessToken
+        accessTokenEntity.status = TokenStatus.active
+        accessTokenEntity.tokenType = accessType
+        accessTokenEntity.expiresAt = LocalDateTime.now().plusSeconds(jwtExpiration / 1000)
+        tokenRepository.save(accessTokenEntity)
+
+        return new AuthResponse(
+                newAccessToken,
+                refreshToken,
+                user.id,
+                user.email,
+                user.role.name
+        )
     }
 
     @Transactional
@@ -203,8 +232,7 @@ class AuthService {
         Token tokenEntity = tokenRepository.findByToken(refreshToken)
                 .orElseThrow({ ApiException.authError("Token not found") })
 
-        tokenEntity.status = TokenStatus.revoked
-        tokenRepository.save(tokenEntity)
+        tokenRepository.delete(tokenEntity)
         log.info("User logged out successfully: userId={}", tokenEntity.user.id)
     }
 }

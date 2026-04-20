@@ -42,16 +42,14 @@ class AuthController {
     }
 
     @PostMapping("/verify-otp")
-    @Operation(summary = "Verify OTP", description = "Verifies the 6-digit OTP and returns tokens.")
+    @Operation(summary = "Verify OTP", description = "Verifies the 6-digit OTP.")
     @ApiResponses([
-            @ApiResponse(responseCode = "200", description = "OTP verified successfully", content = @Content(schema = @Schema(implementation = AuthResponse))),
+            @ApiResponse(responseCode = "200", description = "OTP verified successfully"),
             @ApiResponse(responseCode = "401", description = "Invalid or expired OTP", content = @Content(schema = @Schema(implementation = ApiErrorResponse)))
     ])
-    ResponseEntity<AuthResponse> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
-        AuthResponse response = authService.verifyOtp(request)
-        return ResponseEntity.ok()
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + response.token)
-                .body(response)
+    ResponseEntity<Map<String, String>> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
+        authService.verifyOtp(request)
+        return ResponseEntity.ok(Map.of("message", "OTP verified successfully. Please login to continue."))
     }
 
     @PostMapping("/login")

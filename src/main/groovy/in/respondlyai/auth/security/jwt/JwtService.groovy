@@ -5,8 +5,6 @@ import io.jsonwebtoken.Claims
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.security.Keys
 import jakarta.annotation.PostConstruct
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.stereotype.Service
@@ -14,14 +12,16 @@ import org.springframework.stereotype.Service
 import javax.crypto.SecretKey
 import java.nio.charset.StandardCharsets
 import java.util.function.Function
+import groovy.util.logging.Slf4j
 
 /**
  * Service for JWT token generation, validation, and claim extraction.
  */
+
+@Slf4j
 @Service
 class JwtService {
 
-    private static final Logger log = LoggerFactory.getLogger(JwtService)
 
     @Value('${application.security.jwt.secret-key}')
     private String secretKey
