@@ -53,15 +53,21 @@ class AuthService {
             throw ApiException.badRequest("Password must be between 6 and 40 characters")
         }
 
+        log.debug("Login attempt: email={}", request.email)
+
         // Find user by email
         User user = userRepository.findByEmail(request.email)
                 .orElseThrow({ ApiException.authError("Invalid email") })
 
+        log.debug("User found: userId={}, verified={}", user.id, user.isVerified)
+
         if (!passwordEncoder.matches(request.password, user.password)) {
+            log.warn("Login failed - wrong password: email={}", request.email)
             throw ApiException.authError("Invalid password")
         }
 
         if (!user.isVerified) {
+            log.warn("Login failed - unverified user: userId={}", user.id)
             throw ApiException.forbidden("Please verify your email using the OTP sent to you.")
         }
 

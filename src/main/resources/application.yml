@@ -13,6 +13,13 @@ spring:
     username: ${DB_USER:postgres}
     password: ${DB_PASSWORD:password}
     driver-class-name: org.postgresql.Driver
+    hikari:
+      minimum-idle: 2
+      maximum-pool-size: 10
+      idle-timeout: 300000
+      connection-timeout: 20000
+      max-lifetime: 1200000
+      pool-name: AuthHikariPool
 
   jpa:
     hibernate:
@@ -60,3 +67,13 @@ application:
         expiration: 604800000
     cors:
       allowed-origins: http://localhost:3000,http://localhost:3001
+
+logging:
+  level:
+    root: INFO
+    in.respondlyai: DEBUG
+    org.hibernate.SQL: DEBUG
+    org.hibernate.orm.jdbc.bind: TRACE
+    org.springframework.security: WARN
+    org.springframework.web: WARN
+    org.springframework.web.servlet.DispatcherServlet: WARN

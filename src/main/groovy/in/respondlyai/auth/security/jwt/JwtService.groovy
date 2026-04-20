@@ -5,6 +5,8 @@ import io.jsonwebtoken.Claims
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.security.Keys
 import jakarta.annotation.PostConstruct
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.stereotype.Service
@@ -18,6 +20,8 @@ import java.util.function.Function
  */
 @Service
 class JwtService {
+
+    private static final Logger log = LoggerFactory.getLogger(JwtService)
 
     @Value('${application.security.jwt.secret-key}')
     private String secretKey
@@ -39,6 +43,7 @@ class JwtService {
                 "but got ${keyBytes.length} bytes. Update 'application.security.jwt.secret-key'.")
         }
         signingKey = Keys.hmacShaKeyFor(keyBytes)
+        log.info("JwtService initialized: accessExpiry={}ms, refreshExpiry={}ms", jwtExpiration, refreshExpiration)
     }
 
     /**
@@ -46,6 +51,13 @@ class JwtService {
      */
     String extractEmail(String token) {
         return extractClaim(token, Claims::getSubject)
+    }
+
+    /**
+     * Extracts the role claim from the JWT token.
+     */
+    String extractRole(String token) {
+        return extractClaim(token, { Claims claims -> claims.get("role", String) })
     }
 
     /**
@@ -60,6 +72,7 @@ class JwtService {
      * Generates a new access JWT token for a specific user.
      */
     String generateAccessToken(User user, UserDetails userDetails) {
+        log.debug("Generating access token: userId={}, email={}, role={}", user.id, user.email, user.role.name)
         Map<String, Object> claims = new HashMap<>()
         claims.put("userId", user.id.toString())
         claims.put("role", user.role.name)
@@ -67,17 +80,22 @@ class JwtService {
             claims.put("orgId", user.organizationId)
         }
         claims.put("type", "access")
-        return buildToken(claims, userDetails, jwtExpiration)
+        String token = buildToken(claims, userDetails, jwtExpiration)
+        log.debug("Access token generated: userId={}", user.id)
+        return token
     }
 
     /**
      * Generates a new refresh JWT token for a specific user.
      */
     String generateRefreshToken(User user, UserDetails userDetails) {
+        log.debug("Generating refresh token: userId={}, email={}", user.id, user.email)
         Map<String, Object> claims = new HashMap<>()
         claims.put("userId", user.id.toString())
         claims.put("type", "refresh")
-        return buildToken(claims, userDetails, refreshExpiration)
+        String token = buildToken(claims, userDetails, refreshExpiration)
+        log.debug("Refresh token generated: userId={}", user.id)
+        return token
     }
 
     private String buildToken(Map<String, Object> extraClaims, UserDetails userDetails, long expiration) {
@@ -95,7 +113,13 @@ class JwtService {
      */
     boolean isTokenValid(String token, UserDetails userDetails) {
         final String email = extractEmail(token)
-        return email?.equals(userDetails.getUsername()) && !isTokenExpired(token)
+        boolean valid = email?.equals(userDetails.getUsername()) && !isTokenExpired(token)
+        if (!valid) {
+            log.warn("Token validation failed: email={}, expired={}", email, isTokenExpired(token))
+        } else {
+            log.debug("Token validated successfully: email={}", email)
+        }
+        return valid
     }
 
     private boolean isTokenExpired(String token) {
