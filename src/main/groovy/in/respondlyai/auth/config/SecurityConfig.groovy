@@ -1,6 +1,5 @@
 package in.respondlyai.auth.config
 
-import in.respondlyai.auth.security.jwt.JwtAuthenticationFilter
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
@@ -9,27 +8,17 @@ import org.springframework.security.config.http.SessionCreationPolicy
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.security.web.SecurityFilterChain
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter
 import org.springframework.web.cors.CorsConfiguration
 import org.springframework.web.cors.CorsConfigurationSource
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource
 import org.springframework.beans.factory.annotation.Value
 
-
 @Configuration
 @EnableWebSecurity
 class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter
-    
     @Value('${application.security.cors.allowed-origins}')
     private List<String> allowedOrigins
-
-
-    SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
-
-        this.jwtAuthenticationFilter = jwtAuthenticationFilter
-    }
 
     @Bean
     PasswordEncoder passwordEncoder() {
@@ -38,19 +27,18 @@ class SecurityConfig {
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-
         http
             .cors { cors -> cors.configurationSource(corsConfigurationSource()) }
             .csrf { csrf -> csrf.disable() }
             .authorizeHttpRequests { auth ->
                 auth
-                    .requestMatchers("/api/auth/**", "/error", "/swagger-ui/**", "/v3/api-docs/**", "/swagger-resources/**", "/webjars/**").permitAll()
+                    .requestMatchers("/api/v1/auth/**").permitAll()
+                    .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/actuator/**").permitAll()
                     .anyRequest().authenticated()
             }
             .formLogin { form -> form.disable() }
             .httpBasic { basic -> basic.disable() }
             .sessionManagement { session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter)
 
         return http.build()
     }
@@ -59,7 +47,6 @@ class SecurityConfig {
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration()
         configuration.allowedOrigins = allowedOrigins
-
         configuration.allowedMethods = Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS")
         configuration.allowedHeaders = Arrays.asList("Authorization", "Content-Type")
         configuration.allowCredentials = true
