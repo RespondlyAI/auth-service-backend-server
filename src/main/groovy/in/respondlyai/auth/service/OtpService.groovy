@@ -1,17 +1,15 @@
 package in.respondlyai.auth.service
 
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
+import groovy.util.logging.Slf4j
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.stereotype.Service
 
 import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.TimeUnit
 
+@Slf4j
 @Service
 class OtpService {
-
-    private static final Logger log = LoggerFactory.getLogger(OtpService)
     private static final long OTP_TTL_MINUTES = 5
 
     private final StringRedisTemplate redisTemplate

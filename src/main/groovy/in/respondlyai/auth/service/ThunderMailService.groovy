@@ -1,7 +1,6 @@
 package in.respondlyai.auth.service
 
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
+import groovy.util.logging.Slf4j
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
@@ -10,10 +9,9 @@ import org.springframework.http.MediaType
 import org.springframework.stereotype.Service
 import org.springframework.web.client.RestTemplate
 
+@Slf4j
 @Service
 class ThunderMailService {
-
-    private static final Logger log = LoggerFactory.getLogger(ThunderMailService)
 
     @Value('${thundermail.api.url}')
     private String apiUrl
