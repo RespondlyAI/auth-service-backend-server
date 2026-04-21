@@ -2,6 +2,7 @@ package in.respondlyai.auth.controller
 
 import in.respondlyai.auth.dto.*
 import in.respondlyai.auth.exception.ApiErrorResponse
+import in.respondlyai.auth.exception.ApiException   
 import in.respondlyai.auth.service.AuthService
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.headers.Header
@@ -14,6 +15,7 @@ import io.swagger.v3.oas.annotations.tags.Tag
 import jakarta.validation.Valid
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseCookie
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.*
 
@@ -23,6 +25,9 @@ import org.springframework.web.bind.annotation.*
 class AuthController {
 
     private final AuthService authService
+
+    @org.springframework.beans.factory.annotation.Value('${application.security.jwt.refresh-token.expiration}')
+    private long refreshExpiration
 
     AuthController(AuthService authService) {
         this.authService = authService
@@ -72,29 +77,65 @@ class AuthController {
     ])
     ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         AuthResponse response = authService.login(request)
+        
+        ResponseCookie cookie = ResponseCookie.from("refreshToken", response.refreshToken)
+                .httpOnly(true)
+                .secure(false)
+                .path("/")
+                .maxAge((long) (refreshExpiration / 1000))
+                .sameSite("Lax")
+                .build()
+
         return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + response.token)
                 .body(response)
     }
 
     @PostMapping("/refresh")
-    @Operation(summary = "Refresh access token", description = "Uses a valid refresh token to generate a new pair of tokens.")
+    @Operation(summary = "Refresh access token", description = "Uses a valid refresh token from cookie to generate a new pair of tokens.")
     @ApiResponses([
             @ApiResponse(responseCode = "200", description = "Token refreshed successfully", content = @Content(schema = @Schema(implementation = AuthResponse))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized — invalid or expired refresh token", content = @Content(schema = @Schema(implementation = ApiErrorResponse)))
+            @ApiResponse(responseCode = "401", description = "Unauthorized — missing, invalid or expired refresh token", content = @Content(schema = @Schema(implementation = ApiErrorResponse)))
     ])
-    ResponseEntity<AuthResponse> refresh(@Valid @RequestBody RefreshTokenRequest request) {
-        AuthResponse response = authService.refreshToken(request.refreshToken)
+    ResponseEntity<AuthResponse> refresh(@CookieValue(name = "refreshToken", required = false) String refreshToken) {
+        if (!refreshToken) {
+            throw ApiException.authError("Refresh token missing")
+        }
+        
+        AuthResponse response = authService.refreshToken(refreshToken)
+        
+        ResponseCookie cookie = ResponseCookie.from("refreshToken", response.refreshToken)
+                .httpOnly(true)
+                .secure(false)
+                .path("/")
+                .maxAge((long) (refreshExpiration / 1000))
+                .sameSite("Lax")
+                .build()
+
         return ResponseEntity.ok()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + response.token)
                 .body(response)
     }
 
     @PostMapping("/logout")
-    @Operation(summary = "Logout user", description = "Revokes the provided refresh token.")
+    @Operation(summary = "Logout user", description = "Revokes the refresh token and clears the cookie.")
     @ApiResponse(responseCode = "204", description = "Logged out successfully")
-    ResponseEntity<Void> logout(@Valid @RequestBody RefreshTokenRequest request) {
-        authService.logout(request.refreshToken)
-        return ResponseEntity.noContent().build()
+    ResponseEntity<Void> logout(@CookieValue(name = "refreshToken", required = false) String refreshToken) {
+        if (refreshToken) {
+            authService.logout(refreshToken)
+        }
+        
+        ResponseCookie cookie = ResponseCookie.from("refreshToken", "")
+                .httpOnly(true)
+                .secure(false)
+                .path("/")
+                .maxAge(0)
+                .build()
+
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, cookie.toString())
+                .build()
     }
 }

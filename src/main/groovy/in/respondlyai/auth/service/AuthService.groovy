@@ -161,25 +161,15 @@ class AuthService {
         String accessToken = jwtService.generateAccessToken(user, userDetails)
         String refreshToken = jwtService.generateRefreshToken(user, userDetails)
 
-        TokenType accessType = tokenTypeRepository.findByName("ACCESS")
-                .orElseThrow({ ApiException.internalError("Token types not initialized") })
         TokenType refreshType = tokenTypeRepository.findByName("REFRESH")
                 .orElseThrow({ ApiException.internalError("Token types not initialized") })
-
-        Token accessTokenEntity = new Token()
-        accessTokenEntity.user = user
-        accessTokenEntity.token = accessToken
-        accessTokenEntity.status = TokenStatus.active
-        accessTokenEntity.tokenType = accessType
-        accessTokenEntity.expiresAt = LocalDateTime.now().plusSeconds(jwtExpiration / 1000)
-        tokenRepository.save(accessTokenEntity)
 
         Token refreshTokenEntity = new Token()
         refreshTokenEntity.user = user
         refreshTokenEntity.token = refreshToken
         refreshTokenEntity.status = TokenStatus.active
         refreshTokenEntity.tokenType = refreshType
-        refreshTokenEntity.expiresAt = LocalDateTime.now().plusSeconds(refreshExpiration / 1000)
+        refreshTokenEntity.expiresAt = LocalDateTime.now().plusSeconds((long) (refreshExpiration / 1000))
         tokenRepository.save(refreshTokenEntity)
 
         return new AuthResponse(
@@ -218,17 +208,6 @@ class AuthService {
 
         UserDetails userDetails = AppUserDetailsService.toUserDetails(user)
         String newAccessToken = jwtService.generateAccessToken(user, userDetails)
-
-        TokenType accessType = tokenTypeRepository.findByName("ACCESS")
-                .orElseThrow({ ApiException.internalError("Token types not initialized") })
-        
-        Token accessTokenEntity = new Token()
-        accessTokenEntity.user = user
-        accessTokenEntity.token = newAccessToken
-        accessTokenEntity.status = TokenStatus.active
-        accessTokenEntity.tokenType = accessType
-        accessTokenEntity.expiresAt = LocalDateTime.now().plusSeconds(jwtExpiration / 1000)
-        tokenRepository.save(accessTokenEntity)
 
         return new AuthResponse(
                 newAccessToken,

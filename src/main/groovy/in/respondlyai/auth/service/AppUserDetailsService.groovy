@@ -44,7 +44,7 @@ class AppUserDetailsService implements UserDetailsService {
         return new org.springframework.security.core.userdetails.User(
                 user.email,
                 user.password,
-                Collections.singletonList(new SimpleGrantedAuthority("ROLE_${user.role.name()}"))
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_${user.role.name}"))
         )
     }
 }
