@@ -26,10 +26,5 @@ class SwaggerConfig {
                     .name("Private")
                 )
             )
-            .servers([
-                new Server()
-                    .url("http://localhost:8080")
-                    .description("Local Development Server")
-            ])
     }
 }
