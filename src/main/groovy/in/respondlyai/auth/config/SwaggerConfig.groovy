@@ -14,6 +14,7 @@ class SwaggerConfig {
     @Bean
     OpenAPI openAPI() {
         return new OpenAPI()
+            .addServersItem(new Server().url("/").description("API Gateway Server"))
             .info(new Info()
                 .title("RespondlyAI Auth Service API")
                 .description("Authentication and authorization service for RespondlyAI platform")
