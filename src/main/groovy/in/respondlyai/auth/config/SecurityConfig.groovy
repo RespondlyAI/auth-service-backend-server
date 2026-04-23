@@ -17,8 +17,6 @@ import org.springframework.beans.factory.annotation.Value
 @EnableWebSecurity
 class SecurityConfig {
 
-    @Value('${application.security.cors.allowed-origins}')
-    private List<String> allowedOrigins
 
     @Bean
     PasswordEncoder passwordEncoder() {
@@ -28,7 +26,7 @@ class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .cors { cors -> cors.configurationSource(corsConfigurationSource()) }
+            .cors { cors-> cors.disable()}
             .csrf { csrf -> csrf.disable() }
             .authorizeHttpRequests { auth ->
                 auth
@@ -41,17 +39,5 @@ class SecurityConfig {
             .sessionManagement { session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS) }
 
         return http.build()
-    }
-
-    @Bean
-    CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration()
-        configuration.allowedOrigins = allowedOrigins
-        configuration.allowedMethods = Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS")
-        configuration.allowedHeaders = Arrays.asList("Authorization", "Content-Type")
-        configuration.allowCredentials = true
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource()
-        source.registerCorsConfiguration("/**", configuration)
-        return source
     }
 }
