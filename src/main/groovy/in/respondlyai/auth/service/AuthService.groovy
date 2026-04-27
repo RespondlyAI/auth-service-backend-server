@@ -22,7 +22,7 @@ class AuthService {
     private final TokenTypeRepository tokenTypeRepository
     private final PasswordEncoder passwordEncoder
     private final JwtService jwtService
-    private final ThunderMailService thunderMailService
+    private final EmailService emailService
     private final OtpService otpService
 
     @org.springframework.beans.factory.annotation.Value('${application.security.jwt.expiration}')
@@ -34,14 +34,14 @@ class AuthService {
     AuthService(UserRepository userRepository, RoleRepository roleRepository,
                 TokenRepository tokenRepository, TokenTypeRepository tokenTypeRepository,
                 PasswordEncoder passwordEncoder, JwtService jwtService,
-                ThunderMailService thunderMailService, OtpService otpService) {
+                EmailService emailService, OtpService otpService) {
         this.userRepository = userRepository
         this.roleRepository = roleRepository
         this.tokenRepository = tokenRepository
         this.tokenTypeRepository = tokenTypeRepository
         this.passwordEncoder = passwordEncoder
         this.jwtService = jwtService
-        this.thunderMailService = thunderMailService
+        this.emailService = emailService
         this.otpService = otpService
     }
 
@@ -105,7 +105,7 @@ class AuthService {
             String otp = otpService.generateAndStoreOtp(savedUser.id.toString())
             log.info("User created successfully (unverified): userId={}", savedUser.id)
 
-            thunderMailService.sendOtpEmail(savedUser.email, otp)
+            emailService.sendOtpEmail(savedUser.email, otp)
 
             return new AuthResponse(
                     null,
@@ -152,7 +152,7 @@ class AuthService {
         String otp = otpService.generateAndStoreOtp(user.id.toString())
         log.info("Resending OTP for user: userId={}", user.id)
 
-        thunderMailService.sendOtpEmail(user.email, otp)
+        emailService.sendOtpEmail(user.email, otp)
     }
 
     // Helper method to generate access and refresh tokens and save them to DB
