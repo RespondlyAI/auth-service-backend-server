@@ -60,11 +60,9 @@ management:
     health:
       show-details: always
 
-thundermail:
-  api:
-    url: https://thundermail-web-aws.vercel.app/api/v3
-    token: ${THUNDERMAIL_TOKEN:tim_9cd9ac671e3ad8ebc04fb23053057c81}
-    from: ${THUNDERMAIL_FROM:kapoorutkarsh17@gmail.com}
+email-service:
+    url: ${EMAIL_SERVICE_URL:https://y47joumyc5.execute-api.ap-south-1.amazonaws.com/dev}
+    from: ${EMAIL_SERVICE_FROM:kapoorutkarsh17@gmail.com}
 
 application:
   security:
