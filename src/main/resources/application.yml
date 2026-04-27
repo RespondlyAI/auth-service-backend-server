@@ -61,7 +61,7 @@ management:
       show-details: always
 
 email-service:
-    url: ${EMAIL_SERVICE_URL:https://y47joumyc5.execute-api.ap-south-1.amazonaws.com/dev}
+    url: ${EMAIL_SERVICE_URL}
     from: ${EMAIL_SERVICE_FROM:kapoorutkarsh17@gmail.com}
 
 application:
