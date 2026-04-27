@@ -62,7 +62,7 @@ management:
 
 email-service:
     url: ${EMAIL_SERVICE_URL:https://y47joumyc5.execute-api.ap-south-1.amazonaws.com/dev}
-    from: ${EMAIL_SERVICE_FROM:kapoorutkarsh17@gmail.com}
+    from: ${EMAIL_SERVICE_FROM:mitrashubhojit2005@gmail.com}
 
 application:
   security:
