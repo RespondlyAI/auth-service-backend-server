@@ -69,7 +69,7 @@ class KafkaConsumerService {
         User newUser = new User()
         newUser.email = invited.email
         newUser.name = invited.email.split("@")[0]
-        newUser.password = "INVITED_USER_PL ACEHOLDER" 
+        newUser.password = "INVITED_USER_PLACEHOLDER" 
         newUser.organizationId = orgId
         newUser.role = role
         newUser.isVerified = false

@@ -50,6 +50,9 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "*"
+        spring.json.value.default.type: "in.respondlyai.auth.dto.OrganizationCreatedEvent"
+        spring.json.use.type.headers: false
+        spring.json.type.mapping: "in.respondlyai.org.dto.events.OrganizationCreatedEvent:in.respondlyai.auth.dto.OrganizationCreatedEvent"
 
   data:
     redis:
