@@ -15,10 +15,12 @@ class KafkaConsumerService {
 
     private final UserRepository userRepository
     private final RoleRepository roleRepository
+    private final EmailService emailService
 
-    KafkaConsumerService(UserRepository userRepository, RoleRepository roleRepository) {
+    KafkaConsumerService(UserRepository userRepository, RoleRepository roleRepository, EmailService emailService) {
         this.userRepository = userRepository
         this.roleRepository = roleRepository
+        this.emailService = emailService
     }
 
     @KafkaListener(topics = "org-events", groupId = "auth-group")
@@ -76,6 +78,8 @@ class KafkaConsumerService {
         
         userRepository.save(newUser)
         log.info("Placeholder user created: {}", invited.email)
-        
+
+        // Send invitation email
+        emailService.sendOrganizationInviteEmail(invited.email, invited.role, orgId)
     }
 }

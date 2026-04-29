@@ -50,6 +50,22 @@ class EmailService {
         )
     }
 
+    void sendOrganizationInviteEmail(String toEmail, String role, String orgId) {
+        sendEmail(
+            "organization_invite",
+            toEmail,
+            "You've been invited to join an organization on RespondlyAI",
+            [
+                member_email: toEmail,
+                role: role,
+                organization_id: orgId,
+                organization_name: "RespondlyAI Organization", 
+                creator_name: "The Team",
+                link: "https://respondlyai.in/invite/accept" 
+            ]
+        )
+    }
+
     private void sendEmail(String eventType, String toEmail, String subject, Map<String, Object> metadata) {
         try {
             HttpHeaders headers = new HttpHeaders()
