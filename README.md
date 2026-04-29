@@ -175,7 +175,7 @@ The JWT is also returned as a `Bearer` token in the `Authorization` response hea
 | `email` | VARCHAR | Unique, required |
 | `password` | VARCHAR | BCrypt-hashed |
 | `is_verified` | BOOLEAN | Default `false` |
-| `role` | VARCHAR | `OWNER` / `ADMIN` / `EMPLOYEE` |
+| `role` | VARCHAR | `OWNER` / `ADMIN` / `MEMBER` |
 | `organization_id` | VARCHAR | Nullable |
 | `created_at` | TIMESTAMP | Set on insert |
 | `updated_at` | TIMESTAMP | Updated on every save |
@@ -321,3 +321,4 @@ Flyway runs automatically on startup. Migration scripts live in `src/main/resour
 ```
 
 The test suite requires no running database — the context load test excludes `DataSourceAutoConfiguration`.
+.

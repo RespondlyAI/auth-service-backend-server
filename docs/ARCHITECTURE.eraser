@@ -142,7 +142,7 @@ Persistence [color: green] {
     Columns: uuid, user_id, name, email, password,
              is_verified, role, organization_id,
              created_at, updated_at
-    Constraint: chk_role (OWNER | ADMIN | EMPLOYEE)
+    Constraint: chk_role (OWNER | ADMIN | MEMBER)
   }
   Flyway [icon: layers] {
     Schema Migration Tool
