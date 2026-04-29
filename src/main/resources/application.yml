@@ -42,7 +42,7 @@ spring:
     validate-on-migrate: false
 
   kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    bootstrap-servers: ${KAFKA_URL:localhost:9092}
     consumer:
       group-id: auth-group
       auto-offset-reset: earliest

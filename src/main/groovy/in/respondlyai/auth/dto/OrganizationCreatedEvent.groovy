@@ -9,9 +9,13 @@ class OrganizationCreatedEvent {
     UUID ownerUserId
     List<InvitedUser> invitedUsers
 
+    OrganizationCreatedEvent() {}
+
     @Canonical
     static class InvitedUser {
         String email
         String role
+
+        InvitedUser() {}
     }
 }
