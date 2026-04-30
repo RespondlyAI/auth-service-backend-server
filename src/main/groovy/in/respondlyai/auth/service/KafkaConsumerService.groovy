@@ -73,7 +73,7 @@ class KafkaConsumerService {
         newUser.name = invited.email.split("@")[0]
         newUser.password = "INVITED_USER_PLACEHOLDER" 
         newUser.organizationId = orgId
-        newUser.role = role
+        newUser.roleId = role.id
         newUser.isVerified = false
         
         userRepository.save(newUser)

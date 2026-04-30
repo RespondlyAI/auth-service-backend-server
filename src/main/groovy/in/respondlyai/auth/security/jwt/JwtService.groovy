@@ -71,11 +71,11 @@ class JwtService {
     /**
      * Generates a new access JWT token for a specific user.
      */
-    String generateAccessToken(User user, UserDetails userDetails) {
-        log.debug("Generating access token: userId={}, email={}, role={}", user.id, user.email, user.role.name)
+    String generateAccessToken(User user, UserDetails userDetails, String roleName) {
+        log.debug("Generating access token: userId={}, email={}, role={}", user.id, user.email, roleName)
         Map<String, Object> claims = new HashMap<>()
         claims.put("userId", user.id.toString())
-        claims.put("role", user.role.name)
+        claims.put("role", roleName)
         if (user.organizationId) {
             claims.put("orgId", user.organizationId)
         }

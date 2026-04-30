@@ -25,9 +25,8 @@ class User {
     @Column(name = "is_verified", nullable = false)
     Boolean isVerified = false
 
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "role_id", nullable = false)
-    Role role
+    @Column(name = "role_id", nullable = false)
+    UUID roleId
 
     @Column(name = "organization_id")
     String organizationId

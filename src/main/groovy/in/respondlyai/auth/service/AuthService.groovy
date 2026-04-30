@@ -80,7 +80,8 @@ class AuthService {
 
         log.info("User logged in successfully: userId={}, email={}", user.id, user.email)
 
-        return generateAuthResponse(user)
+        String roleName = roleRepository.findById(user.roleId).map({it.name}).orElse("UNKNOWN")
+        return generateAuthResponse(user, roleName)
     }
 
     @Transactional
@@ -98,7 +99,7 @@ class AuthService {
             user.setName(request.name)
             user.setEmail(request.email)
             user.setPassword(passwordEncoder.encode(request.password))
-            user.setRole(ownerRole)
+            user.setRoleId(ownerRole.id)
 
             User savedUser = userRepository.save(user)
 
@@ -112,7 +113,7 @@ class AuthService {
                     null,
                     savedUser.id,
                     savedUser.email,
-                    savedUser.role.name
+                    ownerRole.name
             )
         } catch (Exception ex) {
             if (ex instanceof ApiException) throw ex
@@ -156,9 +157,9 @@ class AuthService {
     }
 
     // Helper method to generate access and refresh tokens and save them to DB
-    private AuthResponse generateAuthResponse(User user) {
-        UserDetails userDetails = AppUserDetailsService.toUserDetails(user)
-        String accessToken = jwtService.generateAccessToken(user, userDetails)
+    private AuthResponse generateAuthResponse(User user, String roleName) {
+        UserDetails userDetails = AppUserDetailsService.toUserDetails(user, roleName)
+        String accessToken = jwtService.generateAccessToken(user, userDetails, roleName)
         String refreshToken = jwtService.generateRefreshToken(user, userDetails)
 
         TokenType refreshType = tokenTypeRepository.findByName("REFRESH")
@@ -177,7 +178,7 @@ class AuthService {
                 refreshToken,
                 user.id,
                 user.email,
-                user.role.name
+                roleName
         )
     }
 
@@ -206,15 +207,16 @@ class AuthService {
 
         log.info("Issuing new access token for user: userId={}", user.id)
 
-        UserDetails userDetails = AppUserDetailsService.toUserDetails(user)
-        String newAccessToken = jwtService.generateAccessToken(user, userDetails)
+        String roleName = roleRepository.findById(user.roleId).map({it.name}).orElse("UNKNOWN")
+        UserDetails userDetails = AppUserDetailsService.toUserDetails(user, roleName)
+        String newAccessToken = jwtService.generateAccessToken(user, userDetails, roleName)
 
         return new AuthResponse(
                 newAccessToken,
                 refreshToken,
                 user.id,
                 user.email,
-                user.role.name
+                roleName
         )
     }
 
